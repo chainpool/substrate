@@ -10,7 +10,7 @@ build = "build.rs"
 
 [dependencies]
 error-chain = "0.12"
-node-cli = { path = "node/cli" }
+node-cli = { path = "node/cli", features = ["msgbus-redis", "msgbus-redis-keyhash", "cache-lru"] }
 futures = "0.1"
 ctrlc = { version = "3.0", features = ["termination"] }
 
@@ -97,3 +97,6 @@ is-it-maintained-open-issues = { repository = "paritytech/substrate" }
 [profile.release]
 # Substrate runtime requires unwinding.
 panic = "unwind"
+
+[features]
+msgbus-redis = []

@@ -21,6 +21,22 @@
 
 #[macro_use]
 mod traits;
+#[macro_use]
+extern crate substrate_telemetry;
+extern crate exit_future;
+
+#[macro_use]
+extern crate lazy_static;
+extern crate clap;
+#[macro_use]
+extern crate error_chain;
+#[macro_use]
+extern crate log;
+extern crate structopt;
+
+#[cfg(any(feature = "msgbus-redis", feature = "cache-lru"))]
+extern crate srml_support;
+
 mod params;
 pub mod error;
 pub mod informant;
@@ -422,6 +438,16 @@ where
 	RS: FnOnce(E, RP, FactoryFullConfiguration<F>) -> Result<(), String>,
  {
 	let config = create_run_node_config::<F, _>(cli.left, spec_factory, impl_name, version)?;
+
+	#[cfg(feature = "msgbus-redis")] {
+		/*let connect = matches.value_of("redis").unwrap_or("127.0.0.1");
+		let connect = format!("redis://{}/", connect);
+		println!("redis {:?}", connect);
+		use srml_support::storage::redis::init_redis;
+		if let Err(e) = init_redis(&connect){
+			bail!(create_input_err(format!("Redis error!\n{}", format!("redis error! \n{}", e))))
+		};*/
+	}
 
 	run_service(exit, cli.right, config).map_err(Into::into)
 }

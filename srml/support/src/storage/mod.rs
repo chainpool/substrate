@@ -24,6 +24,14 @@ use crate::codec::{Codec, Decode, KeyedVec, Input};
 #[macro_use]
 pub mod generator;
 
+#[cfg(all(feature = "std", feature = "cache-lru"))]
+extern crate lru;
+
+#[cfg(all(feature = "std", feature = "msgbus-redis"))]
+pub mod redis;
+
+// TODO: consider using blake256 to avoid possible preimage attack.
+
 struct IncrementalInput<'a> {
 	key: &'a [u8],
 	pos: usize,

@@ -131,9 +131,15 @@ pub struct RunCmd {
 	#[structopt(long = "key", value_name = "STRING")]
 	pub key: Option<String>,
 
+	//#[cfg(not(feature = "msgbus-redis"))]
 	/// Enable validator mode
 	#[structopt(long = "validator")]
 	pub validator: bool,
+
+	#[cfg(feature = "msgbus-redis")]
+	/// Specify redis connect addr. default is (127.0.0.1)
+	#[structopt(long = "redis", value_name = "URL")]
+	redis: Option<String>,
 
 	/// Run in light client mode
 	#[structopt(long = "light")]

@@ -29,4 +29,18 @@ primitives = { package = "substrate-primitives", path = "../../core/primitives" 
 service = { package = "substrate-service", path = "../../core/service" }
 substrate-telemetry = { path = "../../core/telemetry" }
 names = "0.11.0"
-structopt = "0.2"
+structopt = "0.2.13"
+
+srml-support = { path = "../../srml/support", optional = true, features = ["std", "msgbus-redis", "msgbus-redis-keyhash", "cache-lru"] }
+[features]
+msgbus-redis = [
+    "srml-support"
+]
+
+msgbus-redis-keyhash = [
+    "srml-support"
+]
+
+cache-lru = [
+    "srml-support"
+]

@@ -11,7 +11,7 @@ log = "0.4"
 tokio = "0.1.7"
 futures = "0.1"
 exit-future = "0.1"
-cli = { package = "substrate-cli", path = "../../core/cli" }
+cli = { package = "substrate-cli", path = "../../core/cli", features = ["msgbus-redis", "msgbus-redis-keyhash", "cache-lru"] }
 parity-codec = { version = "3.0" }
 slog = "^2"
 sr-io = { path = "../../core/sr-io" }
@@ -35,5 +35,11 @@ substrate-keystore = { path = "../../core/keystore" }
 service-test = { package = "substrate-service-test", path = "../../core/service/test" }
 
 [build-dependencies]
-cli = { package = "substrate-cli", path = "../../core/cli" }
-structopt = "0.2"
+cli = { package = "substrate-cli",  path = "../../core/cli" }
+structopt = "0.2.13"
+clap = "~2.32"
+
+[features]
+msgbus-redis = []
+msgbus-redis-keyhash = []
+cache-lru = []
