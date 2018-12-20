@@ -52,6 +52,9 @@ extern crate error_chain;
 extern crate log;
 extern crate structopt;
 
+#[cfg(any(feature = "msgbus-redis", feature = "cache-lru"))]
+extern crate srml_support;
+
 mod params;
 pub mod error;
 pub mod informant;
@@ -329,6 +332,16 @@ where
 		config.telemetry_url = None;
 	} else if let Some(url) = matches.value_of("telemetry_url") {
 		config.telemetry_url = Some(url.to_owned());
+	}
+
+	#[cfg(feature = "msgbus-redis")] {
+		let connect = matches.value_of("redis").unwrap_or("127.0.0.1");
+		let connect = format!("redis://{}/", connect);
+		println!("redis {:?}", connect);
+		use srml_support::storage::redis::init_redis;
+		if let Err(e) = init_redis(&connect){
+			bail!(create_input_err(format!("Redis error!\n{}", format!("redis error! \n{}", e))))
+		};
 	}
 
 	Ok((spec, config))

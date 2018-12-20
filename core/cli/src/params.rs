@@ -37,9 +37,15 @@ pub struct CoreParams {
 	#[structopt(long = "node-key", value_name = "KEY")]
 	node_key: Option<String>,
 
+	#[cfg(not(feature = "msgbus-redis"))]
 	/// Enable validator mode
 	#[structopt(long = "validator")]
 	validator: bool,
+
+	#[cfg(feature = "msgbus-redis")]
+	/// Specify redis connect addr. default is (127.0.0.1)
+	#[structopt(long = "redis", value_name = "URL")]
+	redis: Option<String>,
 
 	/// Run in light client mode
 	#[structopt(long = "light")]
