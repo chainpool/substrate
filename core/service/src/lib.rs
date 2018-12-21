@@ -99,9 +99,9 @@ const DEFAULT_PROTOCOL_ID: &'static str = "sup";
 
 /// Substrate service.
 pub struct Service<Components: components::Components> {
-	client: Arc<ComponentClient<Components>>,
-	network: Option<Arc<components::NetworkService<Components::Factory>>>,
-	transaction_pool: Arc<TransactionPool<Components::TransactionPoolApi>>,
+	pub client: Arc<ComponentClient<Components>>,
+	pub network: Option<Arc<components::NetworkService<Components::Factory>>>,
+	pub transaction_pool: Arc<TransactionPool<Components::TransactionPoolApi>>,
 	keystore: Keystore,
 	exit: ::exit_future::Exit,
 	signal: Option<Signal>,
@@ -294,7 +294,7 @@ impl<Components: components::Components> Service<Components> {
 			//_rpc: Box::new(rpc),
 			_telemetry: telemetry,
 		})
-	}
+}
 
 	/// give the authority key, if we are an authority and have a key
 	pub fn authority_key(&self) -> Option<primitives::ed25519::Pair> {
