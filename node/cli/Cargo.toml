@@ -10,7 +10,7 @@ log = "0.4"
 tokio = "0.1.7"
 futures = "0.1"
 exit-future = "0.1"
-substrate-cli = { path = "../../core/cli", features = ["msgbus-redis", "msgbus-redis-keyhash", "cache-lru"] }
+substrate-cli = { path = "../../core/cli" }
 parity-codec = { version = "2.1" }
 slog = "^2"
 sr-io = { path = "../../core/sr-io" }
@@ -38,6 +38,13 @@ structopt = "0.2.13"
 clap = "~2.32"
 
 [features]
-msgbus-redis = []
-msgbus-redis-keyhash = []
-cache-lru = []
+msgbus-redis = [
+    "substrate-cli/msgbus-redis"
+]
+msgbus-redis-keyhash = [
+    "msgbus-redis",
+    "substrate-cli/msgbus-redis-keyhash",
+]
+cache-lru = [
+    "substrate-cli/cache-lru"
+]

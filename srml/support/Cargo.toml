@@ -42,7 +42,9 @@ msgbus-redis = [
     "lazy_static",
     "parking_lot",
 ]
-msgbus-redis-keyhash = []
+msgbus-redis-keyhash = [
+    "msgbus-redis"
+]
 
 cache-lru = [
     "lru",
