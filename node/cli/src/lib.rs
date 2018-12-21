@@ -52,6 +52,7 @@ mod service;
 mod params;
 mod native_rpc;
 
+use tokio::prelude::Future;
 use tokio::runtime::Runtime;
 pub use cli::{VersionInfo, IntoExit};
 use substrate_service::{ServiceFactory, Roles as ServiceRoles};
@@ -138,8 +139,8 @@ pub fn run<I, T, E>(args: I, exit: E, version: cli::VersionInfo) -> error::Resul
 			let mut runtime = Runtime::new()?;
 			let executor = runtime.executor();
 			match config.roles == ServiceRoles::LIGHT {
-				true => run_until_exit(&mut runtime, service::Factory::new_light(config, executor)?, exit)?,
-				false => run_until_exit(&mut runtime, service::Factory::new_full(config, executor)?, exit)?,
+				true => run_until_exit(runtime, service::Factory::new_light(config, executor)?, exit)?,
+				false => run_until_exit(runtime, service::Factory::new_full(config, executor)?, exit)?,
 			}
 		}
 	}
@@ -147,7 +148,7 @@ pub fn run<I, T, E>(args: I, exit: E, version: cli::VersionInfo) -> error::Resul
 }
 
 fn run_until_exit<T, C, E>(
-	runtime: &mut Runtime,
+	mut runtime: Runtime,
 	service: T,
 	e: E,
 ) -> error::Result<()>
@@ -164,5 +165,14 @@ fn run_until_exit<T, C, E>(
 
 	let _ = runtime.block_on(e.into_exit());
 	exit_send.fire();
+
+	// we eagerly drop the service so that the internal exit future is fired,
+	// but we need to keep holding a reference to the global telemetry guard
+	let _telemetry = service.telemetry();
+	drop(service);
+
+	// TODO [andre]: timeout this future #1318
+	let _ = runtime.shutdown_on_idle().wait();
+
 	Ok(())
 }
