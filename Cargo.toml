@@ -99,4 +99,15 @@ is-it-maintained-open-issues = { repository = "paritytech/substrate" }
 panic = "unwind"
 
 [features]
-msgbus-redis = []
+msgbus-redis = [
+    "node-cli/msgbus-redis"
+]
+
+msgbus-redis-keyhash = [
+    "msgbus-redis",
+    "node-cli/msgbus-redis-keyhash",
+]
+
+cache-lru = [
+    "node-cli/cache-lru"
+]
