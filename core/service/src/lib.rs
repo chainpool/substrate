@@ -293,7 +293,6 @@ impl<Components: components::Components> Service<Components> {
 				}),
 			}))
 		});
-
 		Ok(Service {
 			client,
 			network: Some(network),
