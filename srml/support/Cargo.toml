@@ -14,6 +14,7 @@ sr-io = { path = "../../core/sr-io", default-features = false }
 sr-primitives = { path = "../../core/sr-primitives", default-features = false }
 srml-support-procedural = { path = "./procedural" }
 mashup = "0.1.7"
+once_cell = { version = "0.1.6", default-features = false, optional = true }
 
 redis = { version = "0.9.0", optional = true }
 lru = { version = "0.1.11", optional = true }
@@ -28,6 +29,7 @@ parity-codec-derive = { version = "2.1" }
 default = ["std"]
 std = [
 	"hex-literal",
+	"once_cell",
 	"serde/std",
 	"serde_derive",
 	"sr-io/std",

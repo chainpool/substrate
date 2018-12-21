@@ -49,6 +49,11 @@ extern crate lazy_static;
 
 #[doc(hidden)]
 pub extern crate parity_codec as codec;
+
+#[cfg(feature = "std")]
+#[doc(hidden)]
+pub extern crate once_cell;
+
 pub use self::storage::generator::Storage as GenericStorage;
 
 #[macro_use]
