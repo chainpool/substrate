@@ -55,8 +55,7 @@ impl RedisClient {
 			}
 			None => { return None; }
 		}.map_err(|e| {
-			// TODO log
-			println!("{:?}", e);
+			error!("[redis] [get] failed for {:}, current key:{:?}", e, key);
 			e
 		}).ok()
 	}
