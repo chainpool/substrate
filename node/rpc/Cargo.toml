@@ -14,18 +14,18 @@ parity-codec = "2.1"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-substrate-client = { path = "../client" }
-substrate-executor = { path = "../executor" }
-substrate-network = { path = "../network" }
-substrate-primitives = { path = "../primitives" }
-substrate-transaction-pool = { path = "../transaction-pool" }
-sr-primitives = { path = "../sr-primitives" }
-sr-version = { path = "../sr-version" }
+substrate-client = { path = "../../core/client" }
+substrate-executor = { path = "../../core/executor" }
+substrate-network = { path = "../../core/network" }
+substrate-primitives = { path = "../../core/primitives" }
+substrate-transaction-pool = { path = "../../core/transaction-pool" }
+sr-primitives = { path = "../../core/sr-primitives" }
+sr-version = { path = "../../core/sr-version" }
 tokio = "0.1.7"
 
 [dev-dependencies]
 assert_matches = "1.1"
-substrate-test-client = { path = "../test-client" }
-substrate-consensus-common = { path = "../consensus/common" }
+substrate-test-client = { path = "../../core/test-client" }
+substrate-consensus-common = { path = "../../core/consensus/common" }
 rustc-hex = "2.0"
 hex-literal = "0.1"
