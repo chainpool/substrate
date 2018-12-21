@@ -111,7 +111,7 @@ fn run_until_exit<T, C, E>(
 	e: E,
 ) -> error::Result<()>
 	where
-	    T: Deref<Target=substrate_service::Service<C>>,
+		T: Deref<Target=substrate_service::Service<C>>,
 		C: substrate_service::Components,
 		E: IntoExit,
 {

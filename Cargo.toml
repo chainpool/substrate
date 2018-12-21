@@ -100,14 +100,14 @@ panic = "unwind"
 
 [features]
 msgbus-redis = [
-    "node-cli/msgbus-redis"
+	"node-cli/msgbus-redis"
 ]
 
 msgbus-redis-keyhash = [
-    "msgbus-redis",
-    "node-cli/msgbus-redis-keyhash",
+	"msgbus-redis",
+	"node-cli/msgbus-redis-keyhash",
 ]
 
 cache-lru = [
-    "node-cli/cache-lru"
+	"node-cli/cache-lru"
 ]
