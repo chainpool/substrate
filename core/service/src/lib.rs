@@ -23,7 +23,7 @@ extern crate futures;
 extern crate exit_future;
 extern crate serde;
 extern crate serde_json;
-extern crate parking_lot;
+//extern crate parking_lot;
 extern crate substrate_keystore as keystore;
 extern crate substrate_primitives as primitives;
 extern crate sr_primitives as runtime_primitives;
@@ -35,7 +35,7 @@ extern crate substrate_client_db as client_db;
 extern crate parity_codec as codec;
 extern crate substrate_transaction_pool as transaction_pool;
 extern crate substrate_consensus_aura_primitives as aura_primitives;
-extern crate substrate_rpc_servers as rpc;
+//extern crate substrate_rpc_servers as rpc;
 extern crate target_info;
 extern crate tokio;
 
@@ -60,8 +60,8 @@ pub mod config;
 pub mod chain_ops;
 pub mod consensus;
 
-use std::io;
-use std::net::SocketAddr;
+//use std::io;
+//use std::net::SocketAddr;
 use std::collections::HashMap;
 #[doc(hidden)]
 pub use std::{ops::Deref, result::Result, sync::Arc};
@@ -90,7 +90,8 @@ pub use components::{ServiceFactory, FullBackend, FullExecutor, LightBackend,
 	FactoryFullConfiguration, RuntimeGenesis, FactoryGenesis,
 	ComponentExHash, ComponentExtrinsic, FactoryExtrinsic
 };
-use components::{StartRPC, MaintainTransactionPool};
+//use components::{StartRPC, MaintainTransactionPool};
+use components::MaintainTransactionPool;
 #[doc(hidden)]
 pub use network::OnDemand;
 
@@ -98,15 +99,15 @@ const DEFAULT_PROTOCOL_ID: &'static str = "sup";
 
 /// Substrate service.
 pub struct Service<Components: components::Components> {
-	client: Arc<ComponentClient<Components>>,
-	network: Option<Arc<components::NetworkService<Components::Factory>>>,
-	transaction_pool: Arc<TransactionPool<Components::TransactionPoolApi>>,
+	pub client: Arc<ComponentClient<Components>>,
+	pub network: Option<Arc<components::NetworkService<Components::Factory>>>,
+	pub transaction_pool: Arc<TransactionPool<Components::TransactionPoolApi>>,
 	keystore: Keystore,
 	exit: ::exit_future::Exit,
 	signal: Option<Signal>,
 	/// Configuration of this Service
 	pub config: FactoryFullConfiguration<Components::Factory>,
-	_rpc: Box<::std::any::Any + Send + Sync>,
+	//_rpc: Box<::std::any::Any + Send + Sync>,
 	_telemetry: Option<tel::Telemetry>,
 }
 
@@ -192,7 +193,7 @@ impl<Components: components::Components> Service<Components> {
 			protocol_id
 		};
 
-		let has_bootnodes = !network_params.network_config.boot_nodes.is_empty();
+		//let has_bootnodes = !network_params.network_config.boot_nodes.is_empty();
 		let network = network::Service::new(
 			network_params,
 			protocol_id,
@@ -243,6 +244,7 @@ impl<Components: components::Components> Service<Components> {
 		}
 
 
+/*
 		// RPC
 		let system_info = rpc::apis::system::SystemInfo {
 			chain_name: config.chain_spec.name().into(),
@@ -253,7 +255,7 @@ impl<Components: components::Components> Service<Components> {
 		let rpc = Components::RPC::start_rpc(
 			client.clone(), network.clone(), has_bootnodes, system_info, config.rpc_http, config.rpc_ws, task_executor.clone(), transaction_pool.clone(),
 		)?;
-
+*/
 		// Telemetry
 		let telemetry = match config.telemetry_url.clone() {
 			Some(url) => {
@@ -289,10 +291,10 @@ impl<Components: components::Components> Service<Components> {
 			keystore,
 			config,
 			exit,
-			_rpc: Box::new(rpc),
+			//_rpc: Box::new(rpc),
 			_telemetry: telemetry,
 		})
-	}
+}
 
 	/// give the authority key, if we are an authority and have a key
 	pub fn authority_key(&self) -> Option<primitives::ed25519::Pair> {
@@ -348,6 +350,7 @@ impl<Components> Drop for Service<Components> where Components: components::Comp
 	}
 }
 
+/*
 fn maybe_start_server<T, F>(address: Option<SocketAddr>, start: F) -> Result<Option<T>, io::Error> where
 	F: Fn(&SocketAddr) -> Result<T, io::Error>,
 {
@@ -364,7 +367,7 @@ fn maybe_start_server<T, F>(address: Option<SocketAddr>, start: F) -> Result<Opt
 			})?),
 		None => None,
 	})
-}
+}*/
 
 /// Transaction pool adapter.
 pub struct TransactionPoolAdapter<C: Components> {
