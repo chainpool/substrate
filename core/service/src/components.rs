@@ -16,13 +16,13 @@
 
 //! Substrate service components.
 
-use std::{sync::Arc, net::SocketAddr, marker::PhantomData, ops::Deref, ops::DerefMut};
+use std::{sync::Arc, /*net::SocketAddr, */marker::PhantomData, ops::Deref, ops::DerefMut};
 use serde::{Serialize, de::DeserializeOwned};
 use tokio::runtime::TaskExecutor;
 use crate::chain_spec::ChainSpec;
 use client_db;
-use client::{self, Client, runtime_api::{Metadata, TaggedTransactionQueue}};
-use crate::{error, Service, maybe_start_server};
+use client::{self, Client, runtime_api::TaggedTransactionQueue};
+use crate::{error, Service};
 use consensus_common::import_queue::ImportQueue;
 use network::{self, OnDemand};
 use substrate_executor::{NativeExecutor, NativeExecutionDispatch};
@@ -32,8 +32,8 @@ use runtime_primitives::{
 };
 use crate::config::Configuration;
 use primitives::{Blake2Hasher, H256};
-use rpc::{self, apis::system::SystemInfo};
-use parking_lot::Mutex;
+//use rpc::{self, apis::system::SystemInfo};
+//use parking_lot::Mutex;
 
 // Type aliases.
 // These exist mainly to avoid typing `<F as Factory>::Foo` all over the code.
@@ -132,6 +132,7 @@ pub type PoolApi<C> = <C as Components>::TransactionPoolApi;
 pub trait RuntimeGenesis: Serialize + DeserializeOwned + BuildStorage {}
 impl<T: Serialize + DeserializeOwned + BuildStorage> RuntimeGenesis for T {}
 
+/*
 /// Something that can start the RPC service.
 pub trait StartRPC<C: Components> {
 	type ServersHandle: Send + Sync;
@@ -189,6 +190,7 @@ impl<C: Components> StartRPC<Self> for C where
 		))
 	}
 }
+*/
 
 /// Something that can maintain transaction pool on every imported block.
 pub trait MaintainTransactionPool<C: Components> {
@@ -244,11 +246,11 @@ pub trait ServiceTrait<C: Components>:
 	+ Send
 	+ Sync
 	+ 'static
-	+ StartRPC<C>
+	//+ StartRPC<C>
 	+ MaintainTransactionPool<C>
 {}
 impl<C: Components, T> ServiceTrait<C> for T where
-	T: Deref<Target = Service<C>> + Send + Sync + 'static + StartRPC<C> + MaintainTransactionPool<C>
+	T: Deref<Target = Service<C>> + Send + Sync + 'static + /*StartRPC<C> +*/ MaintainTransactionPool<C>
 {}
 
 /// A collection of types and methods to build a service on top of the substrate service.
@@ -339,8 +341,6 @@ pub trait Components: Sized + 'static {
 	/// The type that implements the runtime API.
 	type RuntimeApi: Send + Sync;
 	/// A type that can start the RPC.
-	type RPC: StartRPC<Self>;
-	// TODO: Traitify transaction pool and allow people to implement their own. (#1242)
 	/// A type that can maintain transaction pool.
 	type TransactionPool: MaintainTransactionPool<Self>;
 	/// Extrinsic pool type.
@@ -416,7 +416,7 @@ impl<Factory: ServiceFactory> Components for FullComponents<Factory> {
 	type TransactionPoolApi = <Factory as ServiceFactory>::FullTransactionPoolApi;
 	type ImportQueue = Factory::FullImportQueue;
 	type RuntimeApi = Factory::RuntimeApi;
-	type RPC = Factory::FullService;
+	//type RPC = Factory::FullService;
 	type TransactionPool = Factory::FullService;
 
 	fn build_client(
@@ -491,7 +491,7 @@ impl<Factory: ServiceFactory> Components for LightComponents<Factory> {
 	type TransactionPoolApi = <Factory as ServiceFactory>::LightTransactionPoolApi;
 	type ImportQueue = <Factory as ServiceFactory>::LightImportQueue;
 	type RuntimeApi = Factory::RuntimeApi;
-	type RPC = Factory::LightService;
+	//type RPC = Factory::LightService;
 	type TransactionPool = Factory::LightService;
 
 	fn build_client(
