@@ -170,14 +170,8 @@ fn run_until_exit<T, C, E>(
 	let (exit_send, exit) = exit_future::signal();
 
 	let executor = runtime.executor();
-    let config = service.config;
-        let system_info = rpc::apis::system::SystemInfo {
-            chain_name: config.chain_spec.name().into(),
-            impl_name: config.impl_name.into(),
-            impl_version: config.impl_version.into(),
-            properties: config.chain_spec.properties(),
-        };
-    let (_http, _ws) = native_rpc::start_rpc(service.client.clone(), service.network.clone().unwrap(), false, system_info, config.rpc_http, config.rpc_ws, executor.clone(), service.transaction_pool.clone());
+    use native_rpc::Rpc;
+    let (_http, _ws) = service.start_rpc(executor.clone());
 	cli::informant::start(&service, exit.clone(), executor.clone());
 
 	let _ = runtime.block_on(e.into_exit());

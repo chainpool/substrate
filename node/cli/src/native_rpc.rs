@@ -1,13 +1,9 @@
 // Copyright 2018 Chainpool
 
+use rpc;
 use std::io;
 use std::net::SocketAddr;
-use std::sync::Arc;
-use rpc;
-use substrate_service::{ComponentExHash, TransactionPool, Components,
-     ComponentClient, ComponentBlock, TaskExecutor};
-use rpc::apis::system::SystemInfo;
-use client::runtime_api::Metadata;
+use substrate_service::{ComponentBlock, ComponentExHash, Components, Service, TaskExecutor};
 
 fn maybe_start_server<T, F>(address: Option<SocketAddr>, start: F) -> Result<Option<T>, io::Error>
 where
@@ -26,39 +22,59 @@ where
     })
 }
 
-pub fn start_rpc<C: Components> (
-    client: Arc<ComponentClient<C>>,
-    network: Arc<network::SyncProvider<ComponentBlock<C>>>,
-    should_have_peers: bool,
-    rpc_system_info: SystemInfo,
-    rpc_http: Option<SocketAddr>,
-    rpc_ws: Option<SocketAddr>,
-    task_executor: TaskExecutor,
-    transaction_pool: Arc<TransactionPool<C::TransactionPoolApi>>,
-)
- -> (
-    Result<Option<rpc::HttpServer>, io::Error>,
-    Result<Option<rpc::WsServer>, io::Error>,
-)
-    where C::RuntimeApi: Metadata<ComponentBlock<C>> {
-    let handler = || {
-        let client = client.clone();
-        let subscriptions = rpc::apis::Subscriptions::new(task_executor.clone());
-        let chain = rpc::apis::chain::Chain::new(client.clone(), subscriptions.clone());
-        let state = rpc::apis::state::State::new(client.clone(), subscriptions.clone());
-        let author =
-            rpc::apis::author::Author::new(client.clone(), transaction_pool.clone(), subscriptions);
-        let system = rpc::apis::system::System::new(
-            rpc_system_info.clone(),
-            network.clone(),
-            should_have_peers,
-        );
-        rpc::rpc_handler::<ComponentBlock<C>, ComponentExHash<C>, _, _, _, _>(
-            state, chain, author, system,
-        )
-    };
+pub trait Rpc {
+    fn start_rpc(
+        &self,
+        task_executor: TaskExecutor,
+    ) -> (
+        Result<Option<rpc::HttpServer>, io::Error>,
+        Result<Option<rpc::WsServer>, io::Error>,
+    );
+}
 
-    let rpc_http: Result<Option<rpc::HttpServer>, io::Error> = maybe_start_server(rpc_http, |address| rpc::start_http(address, handler()));
-    let rpc_ws: Result<Option<rpc::WsServer>, io::Error> = maybe_start_server(rpc_ws, |address| rpc::start_ws(address, handler()));
-    (rpc_http, rpc_ws)
+impl<C> Rpc for Service<C>
+where
+    C: Components, /*, C::RuntimeApi: Metadata<ComponentBlock<C>>*/
+{
+    fn start_rpc(
+        &self,
+        task_executor: TaskExecutor,
+    ) -> (
+        Result<Option<rpc::HttpServer>, io::Error>,
+        Result<Option<rpc::WsServer>, io::Error>,
+    ) {
+        let config = &self.config;
+        let system_info = rpc::apis::system::SystemInfo {
+            chain_name: config.chain_spec.name().into(),
+            impl_name: config.impl_name.into(),
+            impl_version: config.impl_version.into(),
+            properties: config.chain_spec.properties(),
+        };
+
+        let handler = || {
+            let client = self.client.clone();
+            let subscriptions = rpc::apis::Subscriptions::new(task_executor.clone());
+            /*let chain = rpc::apis::chain::Chain::new(client.clone(), subscriptions.clone());
+            let state = rpc::apis::state::State::new(client.clone(), subscriptions.clone());
+            let author =
+                rpc::apis::author::Author::new(client.clone(), self.transaction_pool.clone(), subscriptions);
+            */
+            let system = rpc::apis::system::System::new(
+                system_info.clone(),
+                self.network.clone().unwrap(),
+                //should_have_peers,
+                false,
+            );
+            rpc::rpc_handler::<ComponentBlock<C>, ComponentExHash<C>, /* _, _, _,*/ _>(
+                /*state, chain, author,*/ system,
+            )
+        };
+        let rpc_http: Result<Option<rpc::HttpServer>, io::Error> =
+            maybe_start_server(config.rpc_http, |address| {
+                rpc::start_http(address, handler())
+            });
+        let rpc_ws: Result<Option<rpc::WsServer>, io::Error> =
+            maybe_start_server(config.rpc_ws, |address| rpc::start_ws(address, handler()));
+        (rpc_http, rpc_ws)
+    }
 }
