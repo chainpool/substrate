@@ -247,8 +247,13 @@ where
 			config.block_execution_strategy = service::ExecutionStrategy::NativeWhenPossible;
 			service::Roles::LIGHT
 		} else if matches.is_present("validator") || matches.is_present("dev") {
-			config.block_execution_strategy = service::ExecutionStrategy::Both;
-			service::Roles::AUTHORITY
+			if cfg!(feature = "msgbus-redis") {
+				config.block_execution_strategy = service::ExecutionStrategy::NativeWhenPossible;
+				service::Roles::FULL
+			} else {
+				config.block_execution_strategy = service::ExecutionStrategy::Both;
+				service::Roles::AUTHORITY
+			}
 		} else {
 			config.block_execution_strategy = service::ExecutionStrategy::NativeWhenPossible;
 			service::Roles::FULL
@@ -258,7 +263,13 @@ where
 		config.block_execution_strategy = match s {
 			"both" => service::ExecutionStrategy::Both,
 			"native" => service::ExecutionStrategy::NativeWhenPossible,
-			"wasm" => service::ExecutionStrategy::AlwaysWasm,
+			"wasm" => {
+				if cfg!(feature = "msgbus-redis") {
+					bail!(create_input_err("When in `msgbus` mod, can't use wasm strategy"))
+				} else {
+					service::ExecutionStrategy::AlwaysWasm
+				}
+			},
 			_ => bail!(create_input_err("Invalid execution mode specified")),
 		};
 	}
@@ -531,7 +542,13 @@ fn import_blocks<F, E>(
 		config.block_execution_strategy = match s {
 			"both" => service::ExecutionStrategy::Both,
 			"native" => service::ExecutionStrategy::NativeWhenPossible,
-			"wasm" => service::ExecutionStrategy::AlwaysWasm,
+			"wasm" => {
+				if cfg!(feature = "msgbus-redis") {
+					bail!(create_input_err("When in `msgbus` mod, can't use wasm strategy"))
+				} else {
+					service::ExecutionStrategy::AlwaysWasm
+				}
+			},
 			_ => return Err(error::ErrorKind::Input("Invalid block execution mode specified".to_owned()).into()),
 		};
 	}
@@ -540,7 +557,13 @@ fn import_blocks<F, E>(
 		config.api_execution_strategy = match s {
 			"both" => service::ExecutionStrategy::Both,
 			"native" => service::ExecutionStrategy::NativeWhenPossible,
-			"wasm" => service::ExecutionStrategy::AlwaysWasm,
+			"wasm" => {
+				if cfg!(feature = "msgbus-redis") {
+					bail!(create_input_err("When in `msgbus` mod, can't use wasm strategy"))
+				} else {
+					service::ExecutionStrategy::AlwaysWasm
+				}
+			},
 			_ => return Err(error::ErrorKind::Input("Invalid API execution mode specified".to_owned()).into()),
 		};
 	}
