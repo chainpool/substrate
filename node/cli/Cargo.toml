@@ -37,3 +37,15 @@ substrate-service-test = { path = "../../core/service/test" }
 substrate-cli = { path = "../../core/cli" }
 structopt = "0.2.13"
 clap = "~2.32"
+
+[features]
+msgbus-redis = [
+	"substrate-cli/msgbus-redis"
+]
+msgbus-redis-keyhash = [
+	"msgbus-redis",
+	"substrate-cli/msgbus-redis-keyhash",
+]
+cache-lru = [
+	"substrate-cli/cache-lru"
+]

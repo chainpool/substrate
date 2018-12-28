@@ -43,6 +43,14 @@ extern crate serde_derive;
 #[macro_use]
 extern crate parity_codec_derive;
 
+#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
+#[macro_use]
+extern crate lazy_static;
+
+#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
+#[macro_use]
+extern crate log;
+
 #[doc(hidden)]
 pub extern crate parity_codec as codec;
 
