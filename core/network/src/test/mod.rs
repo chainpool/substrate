@@ -98,7 +98,6 @@ impl<B: BlockT> Verifier<B> for PassThroughVerifier {
 	) -> Result<(ImportBlock<B>, Option<Vec<AuthorityIdFor<B>>>), String> {
 		let new_authorities = header.digest().log(DigestItem::as_authorities_change)
 			.map(|auth| auth.iter().cloned().collect());
-
 		Ok((ImportBlock {
 			origin,
 			header,
