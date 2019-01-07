@@ -865,7 +865,6 @@ impl<Block> client::backend::Backend<Block, Blake2Hasher> for Backend<Block> whe
 			match self.storage.state_db.revert_one() {
 				Some(commit) => {
 					apply_state_commit(&mut transaction, commit);
-
 					let removed = self.blockchain.header(BlockId::Number(best))?.ok_or_else(
 						|| client::error::ErrorKind::UnknownBlock(
 							format!("Error reverting to {}. Block hash not found.", best)))?;
@@ -880,18 +879,6 @@ impl<Block> client::backend::Backend<Block, Blake2Hasher> for Backend<Block> whe
 					self.storage.db.write(transaction).map_err(db_err)?;
 					self.blockchain.update_meta(hash, best, true, false);
 					self.blockchain.leaves.write().revert(removed.hash().clone(), removed.number().clone(), removed.parent_hash().clone());
-//					let _removed = best.clone();
-//					best -= As::sa(1);
-//					let header = self.blockchain.header(BlockId::Number(best))?.ok_or_else(
-//						|| client::error::ErrorKind::UnknownBlock(
-//							format!("Error reverting to {}. Block header not found.", best)))?;
-//
-//					let lookup_key = ::utils::number_and_hash_to_lookup_key(header.number().clone(), header.hash().clone());
-//					transaction.put(columns::META, meta_keys::BEST_BLOCK, &lookup_key);
-//					transaction.delete(columns::KEY_LOOKUP, header.hash().as_ref());
-//					self.storage.db.write(transaction).map_err(db_err)?;
-//					self.blockchain.update_meta(header.hash().clone(), best.clone(), true, false);
-//					self.blockchain.leaves.write().revert(header.hash().clone(), header.number().clone(), header.parent_hash().clone());
 				}
 				None => return Ok(As::sa(c))
 			}
