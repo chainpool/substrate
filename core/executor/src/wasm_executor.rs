@@ -37,6 +37,35 @@ use crate::sandbox;
 use crate::allocator;
 use log::trace;
 
+
+struct Heap {
+	end: u32,
+}
+
+impl Heap {
+	/// Construct new `Heap` struct.
+	///
+	/// Returns `Err` if the heap couldn't allocate required
+	/// number of pages.
+	///
+	/// This could mean that wasm binary specifies memory
+	/// limit and we are trying to allocate beyond that limit.
+	fn new(memory: &MemoryRef) -> Self {
+		Heap {
+			end: memory.used_size().0 as u32,
+		}
+	}
+
+	fn allocate(&mut self, size: u32) -> u32 {
+		let r = self.end;
+		self.end += size;
+		r
+	}
+
+	fn deallocate(&mut self, _offset: u32) {
+	}
+}
+
 #[cfg(feature="wasm-extern-trace")]
 macro_rules! debug_trace {
 	( $( $x:tt )* ) => ( trace!( $( $x )* ) )

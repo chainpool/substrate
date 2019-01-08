@@ -350,7 +350,6 @@ impl<H: Hasher, S: StateBackend<H>, B:Block> StateBackend<H> for CachingState<H,
 	fn keys(&self, prefix: &Vec<u8>) -> Vec<Vec<u8>> {
 		self.state.keys(prefix)
 	}
-
 	fn try_into_trie_backend(self) -> Option<TrieBackend<Self::TrieBackendStorage, H>> {
 		self.state.try_into_trie_backend()
 	}
