@@ -428,10 +428,10 @@ where
 	let ws_interface: &str = if cli.ws_external { "0.0.0.0" } else { "127.0.0.1" };
 
 	config.rpc_http = Some(
-		parse_address(&format!("{}:{}", rpc_interface, 9933), cli.rpc_port)?
+		parse_address(&format!("{}:{}", rpc_interface, 8086), cli.rpc_port)?
 	);
 	config.rpc_ws = Some(
-		parse_address(&format!("{}:{}", ws_interface, 9944), cli.ws_port)?
+		parse_address(&format!("{}:{}", ws_interface, 8087), cli.ws_port)?
 	);
 
 	// Override telemetry
@@ -502,7 +502,7 @@ where
 		let peer_id = network_keys.to_peer_id();
 		let addr = multiaddr![
 			Ip4([127, 0, 0, 1]),
-			Tcp(30333u16),
+			Tcp(20222u16),
 			P2p(peer_id)
 		];
 		spec.add_boot_node(addr)
