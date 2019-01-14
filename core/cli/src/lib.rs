@@ -296,7 +296,7 @@ where
 		if config.network.listen_addresses.is_empty() {
 			let port = match matches.value_of("port") {
 				Some(port) => port.parse().map_err(|_| "Invalid p2p port value specified.")?,
-				None => 30333,
+				None => 20222,
 			};
 			config.network.listen_addresses = vec![
 				iter::once(Protocol::Ip4(Ipv4Addr::new(0, 0, 0, 0)))
@@ -335,8 +335,8 @@ where
 	let rpc_interface: &str = if matches.is_present("rpc_external") { "0.0.0.0" } else { "127.0.0.1" };
 	let ws_interface: &str = if matches.is_present("ws_external") { "0.0.0.0" } else { "127.0.0.1" };
 
-	config.rpc_http = Some(parse_address(&format!("{}:{}", rpc_interface, 9933), "rpc_port", &matches)?);
-	config.rpc_ws = Some(parse_address(&format!("{}:{}", ws_interface, 9944), "ws_port", &matches)?);
+	config.rpc_http = Some(parse_address(&format!("{}:{}", rpc_interface, 8086), "rpc_port", &matches)?);
+	config.rpc_ws = Some(parse_address(&format!("{}:{}", ws_interface, 8087), "ws_port", &matches)?);
 
 	// Override telemetry
 	if matches.is_present("no_telemetry") {
@@ -473,7 +473,7 @@ where
 		let peer_id = network_keys.to_peer_id();
 		let addr = multiaddr![
 			Ip4([127, 0, 0, 1]),
-			Tcp(30333u16),
+			Tcp(20222u16),
 			P2p(peer_id)
 		];
 		spec.add_boot_node(addr)
