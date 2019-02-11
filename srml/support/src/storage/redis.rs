@@ -1,13 +1,12 @@
-extern crate parking_lot;
-extern crate redis;
-
-use self::parking_lot::Mutex;
-
 use std::error::Error;
 use std::string::ToString;
 
-use self::redis::{Connection, RedisError};
-use self::redis::Commands;
+use parking_lot::Mutex;
+use redis::{Connection, RedisError};
+use redis::Commands;
+
+use lazy_static::lazy_static;
+use log::error;
 
 struct RedisClient {
 	conn: Option<Connection>

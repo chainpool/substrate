@@ -304,7 +304,7 @@ impl<Components: components::Components> Service<Components> {
 			//_rpc: Box::new(rpc),
 			_telemetry: telemetry,
 		})
-}
+	}
 
 	/// give the authority key, if we are an authority and have a key
 	pub fn authority_key(&self) -> Option<primitives::ed25519::Pair> {

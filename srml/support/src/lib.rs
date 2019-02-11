@@ -25,31 +25,6 @@ pub use serde;
 pub use sr_std as rstd;
 #[doc(hidden)]
 pub use parity_codec as codec;
-extern crate srml_metadata;
-
-//extern crate mashup;
-#[cfg_attr(test, macro_use)]
-extern crate srml_support_procedural;
-//extern crate substrate_inherents as inherents;
-
-#[cfg(test)]
-#[macro_use]
-extern crate pretty_assertions;
-#[cfg(feature = "std")]
-#[macro_use]
-extern crate serde_derive;
-#[cfg(test)]
-#[macro_use]
-extern crate parity_codec_derive;
-
-#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
-#[macro_use]
-extern crate lazy_static;
-
-#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
-#[macro_use]
-extern crate log;
-
 #[doc(hidden)]
 pub use parity_codec_derive;
 #[cfg(feature = "std")]

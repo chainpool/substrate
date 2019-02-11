@@ -21,19 +21,3 @@ mod block_builder;
 #[cfg(feature = "std")]
 pub use self::block_builder::*;
 pub mod api;
-/// Extend params for Node
-#[derive(Debug/*, StructOpt*/)]
-pub struct Params {
-	/*#[cfg(all(not(feature = "msgbus-redis"), not(feature = "msgbus-redis-keyhash")))]
-	/// Should run as a GRANDPA authority node
-	#[structopt(long = "grandpa-authority", help = "Run Node as a GRANDPA authority, implies --validator")]
-	grandpa_authority: bool,
-
-	#[cfg(all(not(feature = "msgbus-redis"), not(feature = "msgbus-redis-keyhash")))]
-	/// Should run as a GRANDPA authority node only
-	#[structopt(long = "grandpa-authority-only", help = "Run Node as a GRANDPA authority only, don't as a usual validator, implies --grandpa-authority")]
-	grandpa_authority_only: bool,
-
-	#[structopt(flatten)]
-	core: CoreParams*/
-}

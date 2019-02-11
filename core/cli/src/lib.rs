@@ -21,22 +21,6 @@
 
 #[macro_use]
 mod traits;
-#[macro_use]
-extern crate substrate_telemetry;
-extern crate exit_future;
-
-#[macro_use]
-extern crate lazy_static;
-extern crate clap;
-#[macro_use]
-extern crate error_chain;
-#[macro_use]
-extern crate log;
-extern crate structopt;
-
-#[cfg(any(feature = "msgbus-redis", feature = "cache-lru"))]
-extern crate srml_support;
-
 mod params;
 pub mod error;
 pub mod informant;
@@ -365,6 +349,7 @@ where
 		),
 	};
 
+	#[cfg(not(feature = "msgbus-redis"))]
 	let role =
 		if cli.light {
 			config.block_execution_strategy = service::ExecutionStrategy::NativeWhenPossible;
@@ -372,34 +357,22 @@ where
 		} else if cli.validator || cli.shared_params.dev {
 			config.block_execution_strategy = service::ExecutionStrategy::Both;
 			service::Roles::AUTHORITY
-/*		} else if matches.is_present("validator") || matches.is_present("dev") {
-			if cfg!(feature = "msgbus-redis") {
-				config.block_execution_strategy = service::ExecutionStrategy::NativeWhenPossible;
-				service::Roles::FULL
-			} else {
-				config.block_execution_strategy = service::ExecutionStrategy::Both;
-				service::Roles::AUTHORITY
-			}*/
+		} else {
+			config.block_execution_strategy = service::ExecutionStrategy::NativeWhenPossible;
+			service::Roles::FULL
+		};
+
+	#[cfg(feature = "msgbus-redis")]
+	let role =
+		if cli.light {
+			config.block_execution_strategy = service::ExecutionStrategy::NativeWhenPossible;
+			service::Roles::LIGHT
 		} else {
 			config.block_execution_strategy = service::ExecutionStrategy::NativeWhenPossible;
 			service::Roles::FULL
 		};
 
 	config.block_execution_strategy = cli.execution.into();
-	/*if let Some(s) = matches.value_of("execution") {
-		config.block_execution_strategy = match s {
-			"both" => service::ExecutionStrategy::Both,
-			"native" => service::ExecutionStrategy::NativeWhenPossible,
-			"wasm" => {
-				if cfg!(feature = "msgbus-redis") {
-					bail!(create_input_err("When in `msgbus` mod, can't use wasm strategy"))
-				} else {
-					service::ExecutionStrategy::AlwaysWasm
-				}
-			},
-			_ => bail!(create_input_err("Invalid execution mode specified")),
-		};
-	}*/
 
 	config.roles = role;
 	let client_id = config.client_id();
@@ -459,17 +432,17 @@ where
 	S: FnOnce(&str) -> Result<Option<ChainSpec<FactoryGenesis<F>>>, String>,
 	RS: FnOnce(E, RP, FactoryFullConfiguration<F>) -> Result<(), String>,
  {
-	let config = create_run_node_config::<F, _>(cli.left, spec_factory, impl_name, version)?;
+	 #[cfg(feature = "msgbus-redis")] {
+		 let connect = cli.left.redis.clone().unwrap_or("127.0.0.1".to_string());
+		 let connect = format!("redis://{}/", connect);
+		 println!("redis {:?}", connect);
+		 use srml_support::storage::redis::init_redis;
+		 if let Err(e) = init_redis(&connect){
+			 bail!(create_input_err(format!("Redis error!\n{}", e)))
+		 };
+	 }
 
-	#[cfg(feature = "msgbus-redis")] {
-		/*let connect = matches.value_of("redis").unwrap_or("127.0.0.1");
-		let connect = format!("redis://{}/", connect);
-		println!("redis {:?}", connect);
-		use srml_support::storage::redis::init_redis;
-		if let Err(e) = init_redis(&connect){
-			bail!(create_input_err(format!("Redis error!\n{}", format!("redis error! \n{}", e))))
-		};*/
-	}
+	let config = create_run_node_config::<F, _>(cli.left, spec_factory, impl_name, version)?;
 
 	run_service(exit, cli.right, config).map_err(Into::into)
 }
@@ -588,39 +561,7 @@ where
 
 	config.block_execution_strategy = cli.execution.into();
 	config.api_execution_strategy = cli.api_execution.into();
-	/*let mut config = service::Configuration::default_with_spec(spec);
-	config.database_path = db_path.to_string();
-
-	if let Some(s) = matches.value_of("execution") {
-		config.block_execution_strategy = match s {
-			"both" => service::ExecutionStrategy::Both,
-			"native" => service::ExecutionStrategy::NativeWhenPossible,
-			"wasm" => {
-				if cfg!(feature = "msgbus-redis") {
-					bail!(create_input_err("When in `msgbus` mod, can't use wasm strategy"))
-				} else {
-					service::ExecutionStrategy::AlwaysWasm
-				}
-			},
-			_ => return Err(error::ErrorKind::Input("Invalid block execution mode specified".to_owned()).into()),
-		};
-	}
-
-	if let Some(s) = matches.value_of("api-execution") {
-		config.api_execution_strategy = match s {
-			"both" => service::ExecutionStrategy::Both,
-			"native" => service::ExecutionStrategy::NativeWhenPossible,
-			"wasm" => {
-				if cfg!(feature = "msgbus-redis") {
-					bail!(create_input_err("When in `msgbus` mod, can't use wasm strategy"))
-				} else {
-					service::ExecutionStrategy::AlwaysWasm
-				}
-			},
-			_ => return Err(error::ErrorKind::Input("Invalid API execution mode specified".to_owned()).into()),
-		};
-	}*/
-
+//TODO
 	let file: Box<Read> = match cli.input {
 		Some(filename) => Box::new(File::open(filename)?),
 		None => Box::new(stdin()),

@@ -24,20 +24,19 @@ use crate::codec::{Codec, Decode, KeyedVec, Input};
 #[macro_use]
 pub mod generator;
 
+// related with msgbus & cache
 #[cfg(all(feature = "std", feature = "cache-lru"))]
-extern crate lru;
+use lru;
 
 #[cfg(all(feature = "std", feature = "msgbus-redis"))]
 pub mod redis;
 
-//#[cfg(all(feature = "std", feature = "msgbus-redis"))]
+//#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
 pub mod blocknumber;
 
-#[cfg(all(feature = "std", feature = "blocknumber"))]
-use self::blocknumber::blocknumber_hashedkey;
-
-#[cfg(all(feature = "std", feature = "blocknumber"))]
+#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
 pub fn get_blocknumber() -> Option<u64> {
+	use self::blocknumber::blocknumber_hashedkey;
 	let key = blocknumber_hashedkey();
 
 	runtime_io::read_storage(&key[..], &mut [0; 0][..], 0).map(|_| {
@@ -48,8 +47,7 @@ pub fn get_blocknumber() -> Option<u64> {
 		Decode::decode(&mut input).expect("storage is not null, therefore must be a valid type")
 	})
 }
-
-// TODO: consider using blake256 to avoid possible preimage attack.
+// modify end
 
 struct IncrementalInput<'a> {
 	key: &'a [u8],
@@ -103,6 +101,7 @@ pub fn put<T: Codec>(key: &[u8], value: &T) {
 	value.using_encoded(|slice| {
 		runtime_io::set_storage(&hash[..], slice);
 		#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+			use log::info;
 			let blocknumebr = match get_blocknumber() {
 				None => {
 					info!("[redis] get_blocknumber in [put] is None");
@@ -157,6 +156,7 @@ pub fn kill(key: &[u8]) {
 //	runtime_io::clear_storage(&twox_128(key)[..]);
 	let hash = twox_128(key);
 	#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+		use log::info;
 		match get_blocknumber() {
 			None => {
 				info!("[redis] get_blocknumber in [kill] is None");
