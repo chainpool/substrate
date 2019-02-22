@@ -67,6 +67,7 @@ pub use std::{ops::Deref, result::Result, sync::Arc};
 use futures::prelude::*;
 use keystore::Store as Keystore;
 use client::BlockchainEvents;
+use primitives::ed25519::Pair;
 use runtime_primitives::generic::BlockId;
 use runtime_primitives::traits::{Header, As};
 use exit_future::Signal;
@@ -101,6 +102,7 @@ pub struct Service<Components: components::Components> {
 	pub network: Option<Arc<components::NetworkService<Components::Factory>>>,
 	pub transaction_pool: Arc<TransactionPool<Components::TransactionPoolApi>>,
 	keystore: Keystore,
+    private_key: Option<String>,
 	exit: ::exit_future::Exit,
 	signal: Option<Signal>,
 	/// Configuration of this Service
@@ -152,6 +154,8 @@ impl<Components: components::Components> Service<Components> {
 				public_key
 			}
 		};
+
+		let private_key = config.keys.get(0).map(|x| x.to_owned());
 
 		let (client, on_demand) = Components::build_client(&config, executor)?;
 		let import_queue = Arc::new(Components::build_import_queue(&mut config, client.clone())?);
@@ -284,6 +288,7 @@ impl<Components: components::Components> Service<Components> {
 			transaction_pool,
 			signal: Some(signal),
 			keystore,
+            private_key,
 			config,
 			exit,
 			//_rpc: Box::new(rpc),
@@ -294,6 +299,24 @@ impl<Components: components::Components> Service<Components> {
 	/// give the authority key, if we are an authority and have a key
 	pub fn authority_key(&self) -> Option<primitives::ed25519::Pair> {
 		if self.config.roles != Roles::AUTHORITY { return None }
+
+		if let Some(ref private_key) = self.private_key {
+			let private_key = private_key.as_str();
+			if private_key.len() == 85 && &private_key[0..2] == "0x" {
+				let pkcs8_bytes: Vec<u8> = hex::decode(&private_key[2..]).unwrap();
+				if let Ok(pair) = Pair::from_pkcs8(&pkcs8_bytes) {
+					Some(pair)
+				} else {
+					None
+				}
+			} else {
+				None
+			}
+		} else {
+			None
+		}
+
+        /*
 		let keystore = &self.keystore;
 		if let Ok(Some(Ok(key))) =  keystore.contents().map(|keys| keys.get(0)
 				.map(|k| keystore.load(k, "")))
@@ -302,6 +325,7 @@ impl<Components: components::Components> Service<Components> {
 		} else {
 			None
 		}
+		*/
 	}
 
 	pub fn telemetry(&self) -> Option<Arc<tel::Telemetry>> {
