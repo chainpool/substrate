@@ -16,13 +16,13 @@
 
 //! Substrate service components.
 
-use std::{sync::Arc, net::SocketAddr, marker::PhantomData, ops::Deref, ops::DerefMut};
+use std::{sync::Arc, /*net::SocketAddr, */marker::PhantomData, ops::Deref, ops::DerefMut};
 use serde::{Serialize, de::DeserializeOwned};
 use tokio::runtime::TaskExecutor;
 use crate::chain_spec::ChainSpec;
 use client_db;
 use client::{self, Client, runtime_api};
-use crate::{error, Service, maybe_start_server};
+use crate::{error, Service, /*maybe_start_server*/};
 use consensus_common::import_queue::ImportQueue;
 use network::{self, OnDemand};
 use substrate_executor::{NativeExecutor, NativeExecutionDispatch};
@@ -32,8 +32,8 @@ use runtime_primitives::{
 };
 use crate::config::Configuration;
 use primitives::{Blake2Hasher, H256};
-use rpc::{self, apis::system::SystemInfo};
-use parking_lot::Mutex;
+//use rpc::{self, apis::system::SystemInfo};
+//use parking_lot::Mutex;
 
 // Type aliases.
 // These exist mainly to avoid typing `<F as Factory>::Foo` all over the code.
@@ -132,6 +132,7 @@ pub type PoolApi<C> = <C as Components>::TransactionPoolApi;
 pub trait RuntimeGenesis: Serialize + DeserializeOwned + BuildStorage {}
 impl<T: Serialize + DeserializeOwned + BuildStorage> RuntimeGenesis for T {}
 
+/*
 /// Something that can start the RPC service.
 pub trait StartRPC<C: Components> {
 	type ServersHandle: Send + Sync;
@@ -189,6 +190,7 @@ impl<C: Components> StartRPC<Self> for C where
 		))
 	}
 }
+*/
 
 /// Something that can maintain transaction pool on every imported block.
 pub trait MaintainTransactionPool<C: Components> {
@@ -265,7 +267,7 @@ pub trait ServiceTrait<C: Components>:
 	+ Send
 	+ Sync
 	+ 'static
-	+ StartRPC<C>
+	//+ StartRPC<C>
 	+ MaintainTransactionPool<C>
 	+ OffchainWorker<C>
 {}
@@ -274,7 +276,7 @@ impl<C: Components, T> ServiceTrait<C> for T where
 	+ Send
 	+ Sync
 	+ 'static
-	+ StartRPC<C>
+	// + StartRPC<C>
 	+ MaintainTransactionPool<C>
 	+ OffchainWorker<C>
 {}
