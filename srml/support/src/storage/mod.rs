@@ -27,6 +27,31 @@ pub mod storage_items;
 pub mod unhashed;
 pub mod hashed;
 
+// related with msgbus & cache
+#[cfg(all(feature = "std", feature = "cache-lru"))]
+use lru;
+
+#[cfg(all(feature = "std", feature = "msgbus-redis"))]
+pub mod redis;
+
+//#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
+pub mod blocknumber;
+
+#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
+pub fn get_blocknumber() -> Option<u64> {
+	use self::blocknumber::blocknumber_hashedkey;
+	let key = blocknumber_hashedkey();
+
+	runtime_io::read_storage(&key[..], &mut [0; 0][..], 0).map(|_| {
+		let mut input = IncrementalInput {
+			key: &key[..],
+			pos: 0,
+		};
+		Decode::decode(&mut input).expect("storage is not null, therefore must be a valid type")
+	})
+}
+// modify end
+
 struct IncrementalInput<'a> {
 	key: &'a [u8],
 	pos: usize,
@@ -54,6 +79,113 @@ impl<'a> Input for IncrementalChildInput<'a> {
 		self.pos += read;
 		read
 	}
+}
+
+/// Return the value of the item in storage under `key`, or `None` if there is no explicit entry.
+pub fn get<T: Decode + Sized>(key: &[u8]) -> Option<T> {
+	unhashed::get(&twox_128(key))
+}
+
+/// Return the value of the item in storage under `key`, or the type's default if there is no
+/// explicit entry.
+pub fn get_or_default<T: Decode + Sized + Default>(key: &[u8]) -> T {
+	unhashed::get_or_default(&twox_128(key))
+}
+
+/// Return the value of the item in storage under `key`, or `default_value` if there is no
+/// explicit entry.
+pub fn get_or<T: Decode + Sized>(key: &[u8], default_value: T) -> T {
+	unhashed::get_or(&twox_128(key), default_value)
+}
+
+/// Return the value of the item in storage under `key`, or `default_value()` if there is no
+/// explicit entry.
+pub fn get_or_else<T: Decode + Sized, F: FnOnce() -> T>(key: &[u8], default_value: F) -> T {
+	unhashed::get_or_else(&twox_128(key), default_value)
+}
+
+/// Put `value` in storage under `key`.
+pub fn put<T: Encode>(key: &[u8], value: &T) {
+//	unhashed::put(&twox_128(key), value)
+
+	let hash = twox_128(key);
+	unhashed::put(&hash, value);
+	#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+		use log::info;
+		let blocknumebr = match get_blocknumber() {
+			None => {
+				info!("[redis] get_blocknumber in [put] is None");
+				0
+			},
+			Some(b) => b
+		};
+
+		value.using_encoded(|slice| redis::redis_set_with_blocknumer(key, blocknumebr, slice));
+
+		#[cfg(all(feature = "std", feature = "msgbus-redis-keyhash"))] {
+			redis::redis_set(&hash, key);
+		}
+	}
+}
+
+/// Remove `key` from storage, returning its value if it had an explicit entry or `None` otherwise.
+pub fn take<T: Decode + Sized>(key: &[u8]) -> Option<T> {
+	unhashed::take(&twox_128(key))
+}
+
+/// Remove `key` from storage, returning its value, or, if there was no explicit entry in storage,
+/// the default for its type.
+pub fn take_or_default<T: Decode + Sized + Default>(key: &[u8]) -> T {
+	unhashed::take_or_default(&twox_128(key))
+}
+
+/// Return the value of the item in storage under `key`, or `default_value` if there is no
+/// explicit entry. Ensure there is no explicit entry on return.
+pub fn take_or<T: Decode + Sized>(key: &[u8], default_value: T) -> T {
+	unhashed::take_or(&twox_128(key), default_value)
+}
+
+/// Return the value of the item in storage under `key`, or `default_value()` if there is no
+/// explicit entry. Ensure there is no explicit entry on return.
+pub fn take_or_else<T: Decode + Sized, F: FnOnce() -> T>(key: &[u8], default_value: F) -> T {
+	unhashed::take_or_else(&twox_128(key), default_value)
+}
+
+/// Check to see if `key` has an explicit entry in storage.
+pub fn exists(key: &[u8]) -> bool {
+	unhashed::exists(&twox_128(key))
+}
+
+/// Ensure `key` has no explicit entry in storage.
+pub fn kill(key: &[u8]) {
+//	unhashed::kill(&twox_128(key))
+
+	let hash = twox_128(key);
+	#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+		use log::info;
+		match get_blocknumber() {
+			None => {
+				info!("[redis] get_blocknumber in [kill] is None");
+			}, // when blocknumber is None, due to it's `finalise`, don't remove
+			Some(blocknumber) => {
+				redis::redis_set_with_blocknumer(key, blocknumber, b"");
+				#[cfg(all(feature = "std", feature = "msgbus-redis-keyhash"))] {
+					redis::redis_set(&hash, key);
+				}
+			}
+		}
+	}
+	unhashed::kill(&hash);
+}
+
+/// Get a Vec of bytes from storage.
+pub fn get_raw(key: &[u8]) -> Option<Vec<u8>> {
+	unhashed::get_raw(&twox_128(key))
+}
+
+/// Put a raw byte slice into storage.
+pub fn put_raw(key: &[u8], value: &[u8]) {
+	unhashed::put_raw(&twox_128(key), value)
 }
 
 /// The underlying runtime storage.
