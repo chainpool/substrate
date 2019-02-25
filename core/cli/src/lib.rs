@@ -672,11 +672,12 @@ fn init_logger(pattern: &str) {
 	builder.format(move |buf, record| {
 		let now = time::now();
 		let timestamp =
-			time::strftime("%Y-%m-%d %H:%M:%S", &now)
+			time::strftime("%Y-%m-%d %H:%M:%S.%f", &time::now())
 				.expect("Error formatting log timestamp");
+		let timestamp = &timestamp[..23];
 
 		let mut output = if log::max_level() <= log::LevelFilter::Info {
-			format!("{} {}", Colour::Black.bold().paint(timestamp), record.args())
+			format!("{} {} {}", Colour::Black.bold().paint(timestamp), record.level(), record.args())
 		} else {
 			let name = ::std::thread::current()
 				.name()
