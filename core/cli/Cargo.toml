@@ -31,3 +31,18 @@ state-machine = { package = "substrate-state-machine", path = "../../core/state-
 substrate-telemetry = { path = "../../core/telemetry" }
 names = "0.11.0"
 structopt = "0.2"
+
+srml-support = { path = "../../srml/support", optional = true }
+[features]
+msgbus-redis = [
+	"srml-support/msgbus-redis"
+]
+
+msgbus-redis-keyhash = [
+	"msgbus-redis",
+	"srml-support/msgbus-redis-keyhash",
+]
+
+cache-lru = [
+	"srml-support/cache-lru"
+]

@@ -41,6 +41,9 @@ use runtime_io::{twox_128, TestExternalities, Blake2Hasher};
 #[cfg(any(feature = "std", test))]
 use substrate_primitives::ChangesTrieConfiguration;
 
+#[cfg(feature = "std")]
+use srml_support::storage::blocknumber::set_blocknumber_key;
+
 /// Handler for when a new account has been created.
 pub trait OnNewAccount<AccountId> {
 	/// A new account `who` has been registered.
@@ -286,6 +289,8 @@ impl<T: Trait> Module<T> {
 	/// Start the execution of a particular block.
 	pub fn initialise(number: &T::BlockNumber, parent_hash: &T::Hash, txs_root: &T::Hash) {
 		// populate environment.
+		#[cfg(feature = "std")]
+		set_blocknumber_key(Number::<T>::key());
 		storage::unhashed::put(well_known_keys::EXTRINSIC_INDEX, &0u32);
 		<Number<T>>::put(number);
 		<ParentHash<T>>::put(parent_hash);

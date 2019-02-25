@@ -351,11 +351,20 @@ where
 		),
 	};
 
+	#[cfg(not(feature = "msgbus-redis"))]
 	let role =
 		if cli.light {
 			service::Roles::LIGHT
 		} else if cli.validator || cli.shared_params.dev {
 			service::Roles::AUTHORITY
+		} else {
+			service::Roles::FULL
+		};
+
+	#[cfg(feature = "msgbus-redis")]
+	let role =
+		if cli.light {
+			service::Roles::LIGHT
 		} else {
 			service::Roles::FULL
 		};
@@ -394,10 +403,10 @@ where
 	let ws_interface: &str = if cli.ws_external { "0.0.0.0" } else { "127.0.0.1" };
 
 	config.rpc_http = Some(
-		parse_address(&format!("{}:{}", rpc_interface, 9933), cli.rpc_port)?
+		parse_address(&format!("{}:{}", rpc_interface, 8086), cli.rpc_port)?
 	);
 	config.rpc_ws = Some(
-		parse_address(&format!("{}:{}", ws_interface, 9944), cli.ws_port)?
+		parse_address(&format!("{}:{}", ws_interface, 8087), cli.ws_port)?
 	);
 
 	// Override telemetry
@@ -425,6 +434,16 @@ where
 	S: FnOnce(&str) -> Result<Option<ChainSpec<FactoryGenesis<F>>>, String>,
 	RS: FnOnce(E, RP, FactoryFullConfiguration<F>) -> Result<(), String>,
  {
+	#[cfg(feature = "msgbus-redis")] {
+		let connect = cli.left.redis.clone().unwrap_or("127.0.0.1".to_string());
+		let connect = format!("redis://{}/", connect);
+		info!("redis {:?}", connect);
+		use srml_support::storage::redis::init_redis;
+		if let Err(e) = init_redis(&connect){
+			bail!(create_input_err(format!("Redis error!\n{}", e)))
+		};
+	}
+
 	let config = create_run_node_config::<F, _>(cli.left, spec_factory, impl_name, version)?;
 
 	run_service(exit, cli.right, config).map_err(Into::into)
@@ -458,7 +477,7 @@ where
 		let peer_id = network_keys.to_peer_id();
 		let addr = build_multiaddr![
 			Ip4([127, 0, 0, 1]),
-			Tcp(30333u16),
+			Tcp(20222u16),
 			P2p(peer_id)
 		];
 		spec.add_boot_node(addr)
