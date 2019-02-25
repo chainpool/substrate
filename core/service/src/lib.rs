@@ -25,8 +25,8 @@ mod chain_spec;
 pub mod config;
 pub mod chain_ops;
 
-use std::io;
-use std::net::SocketAddr;
+//use std::io;
+//use std::net::SocketAddr;
 use std::collections::HashMap;
 #[doc(hidden)]
 pub use std::{ops::Deref, result::Result, sync::Arc};
@@ -41,6 +41,7 @@ use exit_future::Signal;
 pub use tokio::runtime::TaskExecutor;
 use substrate_executor::NativeExecutor;
 use parity_codec::{Encode, Decode};
+use primitives::ed25519::Pair;
 use tel::telemetry;
 
 pub use self::error::{ErrorKind, Error};
@@ -58,7 +59,8 @@ pub use components::{ServiceFactory, FullBackend, FullExecutor, LightBackend,
 	FactoryFullConfiguration, RuntimeGenesis, FactoryGenesis,
 	ComponentExHash, ComponentExtrinsic, FactoryExtrinsic
 };
-use components::{StartRPC, MaintainTransactionPool};
+//use components::{StartRPC, MaintainTransactionPool};
+use components::MaintainTransactionPool;
 #[doc(hidden)]
 pub use network::OnDemand;
 
@@ -66,15 +68,16 @@ const DEFAULT_PROTOCOL_ID: &'static str = "sup";
 
 /// Substrate service.
 pub struct Service<Components: components::Components> {
-	client: Arc<ComponentClient<Components>>,
-	network: Option<Arc<components::NetworkService<Components::Factory>>>,
-	transaction_pool: Arc<TransactionPool<Components::TransactionPoolApi>>,
+	pub client: Arc<ComponentClient<Components>>,
+	pub network: Option<Arc<components::NetworkService<Components::Factory>>>,
+	pub transaction_pool: Arc<TransactionPool<Components::TransactionPoolApi>>,
 	keystore: Keystore,
+	private_key: Option<String>,
 	exit: ::exit_future::Exit,
 	signal: Option<Signal>,
 	/// Configuration of this Service
 	pub config: FactoryFullConfiguration<Components::Factory>,
-	_rpc: Box<::std::any::Any + Send + Sync>,
+	//_rpc: Box<::std::any::Any + Send + Sync>,
 	_telemetry: Option<Arc<tel::Telemetry>>,
 }
 
@@ -121,6 +124,25 @@ impl<Components: components::Components> Service<Components> {
 				public_key
 			}
 		};
+
+		let private_key = config.keys.get(0).map(|x| x.to_owned());
+        let public_key = match private_key {
+            Some(ref private_key) => {
+				let pkcs8_bytes: Vec<u8> = hex::decode(&private_key[2..]).unwrap();
+				if let Ok(pair) = Pair::from_pkcs8(&pkcs8_bytes) {
+					pair.public()
+				} else {
+					panic!("Fail to generate pair from pkcs8 bytes")
+				}
+			},
+			None => {
+				let key = keystore.generate("")?;
+				let public_key = key.public();
+				info!("Generated a new keypair: {:?}", public_key);
+
+				public_key
+			}
+        };
 
 		let (client, on_demand) = Components::build_client(&config, executor)?;
 		let import_queue = Box::new(Components::build_import_queue(&mut config, client.clone())?);
@@ -256,6 +278,7 @@ impl<Components: components::Components> Service<Components> {
 		}
 
 
+/*
 		// RPC
 		let system_info = rpc::apis::system::SystemInfo {
 			chain_name: config.chain_spec.name().into(),
@@ -267,7 +290,7 @@ impl<Components: components::Components> Service<Components> {
 			client.clone(), network.clone(), has_bootnodes, system_info, config.rpc_http,
 			config.rpc_ws, task_executor.clone(), transaction_pool.clone(),
 		)?;
-
+*/
 		// Telemetry
 		let telemetry = config.telemetry_url.clone().map(|url| {
 			let is_authority = config.roles == Roles::AUTHORITY;
@@ -293,16 +316,16 @@ impl<Components: components::Components> Service<Components> {
 				}),
 			}))
 		});
-
 		Ok(Service {
 			client,
 			network: Some(network),
 			transaction_pool,
 			signal: Some(signal),
 			keystore,
+            private_key,
 			config,
 			exit,
-			_rpc: Box::new(rpc),
+			//_rpc: Box::new(rpc),
 			_telemetry: telemetry,
 		})
 	}
@@ -310,6 +333,17 @@ impl<Components: components::Components> Service<Components> {
 	/// give the authority key, if we are an authority and have a key
 	pub fn authority_key(&self) -> Option<primitives::ed25519::Pair> {
 		if self.config.roles != Roles::AUTHORITY { return None }
+		if let Some(ref private_key) = self.private_key {
+            let pkcs8_bytes: Vec<u8> = hex::decode(&private_key[2..]).unwrap();
+                if let Ok(pair) = Pair::from_pkcs8(&pkcs8_bytes) {
+					Some(pair)
+				} else {
+					panic!("Fail to generate pair from pkcs8 bytes")
+				}
+		} else {
+            panic!("AUTHORITY must provide private key")
+		}
+		/*
 		let keystore = &self.keystore;
 		if let Ok(Some(Ok(key))) =  keystore.contents().map(|keys| keys.get(0)
 				.map(|k| keystore.load(k, "")))
@@ -318,6 +352,7 @@ impl<Components: components::Components> Service<Components> {
 		} else {
 			None
 		}
+		*/
 	}
 
 	pub fn telemetry(&self) -> Option<Arc<tel::Telemetry>> {
@@ -365,6 +400,7 @@ impl<Components> Drop for Service<Components> where Components: components::Comp
 	}
 }
 
+/*
 fn maybe_start_server<T, F>(address: Option<SocketAddr>, start: F) -> Result<Option<T>, io::Error>
 	where F: Fn(&SocketAddr) -> Result<T, io::Error>,
 {
@@ -381,7 +417,7 @@ fn maybe_start_server<T, F>(address: Option<SocketAddr>, start: F) -> Result<Opt
 			})?),
 		None => None,
 	})
-}
+}*/
 
 /// Transaction pool adapter.
 pub struct TransactionPoolAdapter<C: Components> {

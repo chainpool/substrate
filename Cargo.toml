@@ -33,8 +33,8 @@ members = [
 	"core/network",
 	"core/panic-handler",
 	"core/primitives",
-	"core/rpc",
-	"core/rpc-servers",
+#	"core/rpc",
+#	"core/rpc-servers",
 	"core/serializer",
 	"core/service",
 	"core/service/test",
@@ -77,6 +77,8 @@ members = [
 	"srml/timestamp",
 	"srml/treasury",
 	"srml/upgrade-key",
+	"node/rpc",
+	"node/rpc-servers",
 	"node/cli",
 	"node/executor",
 	"node/primitives",
@@ -100,3 +102,17 @@ is-it-maintained-open-issues = { repository = "paritytech/substrate" }
 [profile.release]
 # Substrate runtime requires unwinding.
 panic = "unwind"
+
+[features]
+msgbus-redis = [
+	"cli/msgbus-redis"
+]
+
+msgbus-redis-keyhash = [
+	"msgbus-redis",
+	"cli/msgbus-redis-keyhash",
+]
+
+cache-lru = [
+	"cli/cache-lru"
+]

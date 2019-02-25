@@ -30,7 +30,7 @@ use codec::Decode;
 use consensus_common::{self, evaluation};
 use primitives::{H256, Blake2Hasher};
 use runtime_primitives::traits::{
-	Block as BlockT, Hash as HashT, Header as HeaderT, ProvideRuntimeApi, AuthorityIdFor
+	As, Block as BlockT, Hash as HashT, Header as HeaderT, ProvideRuntimeApi, AuthorityIdFor
 };
 use runtime_primitives::ExecutionContext;
 use runtime_primitives::generic::BlockId;
@@ -200,6 +200,10 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 			&self.parent_id,
 			inherent_data,
 			|block_builder| {
+
+              let session_change_number = 150 - 1;
+              let zero_number = 0;
+              if self.parent_number.as_() % session_change_number != zero_number {
 				let mut is_first = true;
 				let mut skipped = 0;
 				let mut unqueue_invalid = Vec::new();
@@ -240,6 +244,7 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 				}
 
 				self.transaction_pool.remove_invalid(&unqueue_invalid);
+             }
 			})?;
 
 		info!("Prepared block for proposing at {} [hash: {:?}; parent_hash: {}; extrinsics: [{}]]",
