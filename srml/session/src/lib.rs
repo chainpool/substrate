@@ -110,7 +110,7 @@ decl_storage! {
 		/// Block at which the session length last changed.
 		LastLengthChange: Option<T::BlockNumber>;
 		/// The next key for a given validator.
-		NextKeyFor build(|config: &GenesisConfig<T>| {
+		pub NextKeyFor build(|config: &GenesisConfig<T>| {
 			config.keys.clone()
 		}): map T::AccountId => Option<T::SessionKey>;
 		/// The next session length.
