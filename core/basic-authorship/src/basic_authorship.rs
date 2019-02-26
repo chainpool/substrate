@@ -201,9 +201,9 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 			inherent_data,
 			|block_builder| {
 
-              let session_change_number = 150 - 1;
+              let session_change_number = 150;
               let zero_number = 0;
-              if self.parent_number.as_() % session_change_number != zero_number {
+              if (self.parent_number.as_() + 1) % session_change_number != zero_number {
 				let mut is_first = true;
 				let mut skipped = 0;
 				let mut unqueue_invalid = Vec::new();
