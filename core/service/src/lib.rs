@@ -43,7 +43,6 @@ pub use tokio::runtime::TaskExecutor;
 use substrate_executor::NativeExecutor;
 use parity_codec::{Encode, Decode};
 use tel::{telemetry, SUBSTRATE_INFO};
-use primitives::ed25519::Pair;
 
 pub use self::error::{ErrorKind, Error};
 pub use config::{Configuration, Roles, PruningMode};
@@ -73,7 +72,6 @@ pub struct Service<Components: components::Components> {
 	pub network: Option<Arc<components::NetworkService<Components::Factory>>>,
 	pub transaction_pool: Arc<TransactionPool<Components::TransactionPoolApi>>,
 	keystore: Keystore,
-	private_key: Option<String>,
 	exit: ::exit_future::Exit,
 	signal: Option<Signal>,
 	/// Configuration of this Service
@@ -126,25 +124,6 @@ impl<Components: components::Components> Service<Components> {
 			}
 		};
 
-		let private_key = config.keys.get(0).map(|x| x.to_owned());
-        let public_key = match private_key {
-            Some(ref private_key) => {
-				let pkcs8_bytes: Vec<u8> = hex::decode(&private_key[2..]).unwrap();
-				if let Ok(pair) = Pair::from_pkcs8(&pkcs8_bytes) {
-					pair.public()
-				} else {
-					panic!("Fail to generate pair from pkcs8 bytes")
-				}
-			},
-			None => {
-				let key = keystore.generate("")?;
-				let public_key = key.public();
-				info!("Generated a new keypair: {:?}", public_key);
-
-				public_key
-			}
-        };
-
 		let (client, on_demand) = Components::build_client(&config, executor)?;
 		let import_queue = Box::new(Components::build_import_queue(&mut config, client.clone())?);
 		let best_header = client.best_block_header()?;
@@ -183,7 +162,7 @@ impl<Components: components::Components> Service<Components> {
 			protocol_id
 		};
 
-		let has_bootnodes = !network_params.network_config.boot_nodes.is_empty();
+		//let has_bootnodes = !network_params.network_config.boot_nodes.is_empty();
 		let (network, network_chan) = network::Service::new(
 			network_params,
 			protocol_id,
@@ -323,7 +302,6 @@ impl<Components: components::Components> Service<Components> {
 			transaction_pool,
 			signal: Some(signal),
 			keystore,
-            private_key,
 			config,
 			exit,
 			//_rpc: Box::new(rpc),
@@ -334,17 +312,6 @@ impl<Components: components::Components> Service<Components> {
 	/// give the authority key, if we are an authority and have a key
 	pub fn authority_key(&self) -> Option<primitives::ed25519::Pair> {
 		if self.config.roles != Roles::AUTHORITY { return None }
-		if let Some(ref private_key) = self.private_key {
-            let pkcs8_bytes: Vec<u8> = hex::decode(&private_key[2..]).unwrap();
-                if let Ok(pair) = Pair::from_pkcs8(&pkcs8_bytes) {
-					Some(pair)
-				} else {
-					panic!("Fail to generate pair from pkcs8 bytes")
-				}
-		} else {
-            panic!("AUTHORITY must provide private key")
-		}
-		/*
 		let keystore = &self.keystore;
 		if let Ok(Some(Ok(key))) =  keystore.contents().map(|keys| keys.get(0)
 				.map(|k| keystore.load(k, "")))
@@ -353,7 +320,6 @@ impl<Components: components::Components> Service<Components> {
 		} else {
 			None
 		}
-		*/
 	}
 
 	pub fn telemetry(&self) -> Option<Arc<tel::Telemetry>> {
@@ -510,7 +476,7 @@ impl<C: Components> network::TransactionPool<ComponentExHash<C>, ComponentBlock<
 /// 			{ |config, client| Ok(TransactionPool::new(config, transaction_pool::ChainApi::new(client))) },
 /// 		Genesis = GenesisConfig,
 /// 		Configuration = (),
-/// 		FullService = Service<FullComponents<Self>>
+/// 		FullService = ervice<FullComponents<Self>>
 /// 			{ |config, executor| Service::<FullComponents<Factory>>::new(config, executor) },
 ///         // Setup as Consensus Authority (if the role and key are given)
 /// 		AuthoritySetup = {
