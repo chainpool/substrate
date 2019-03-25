@@ -132,15 +132,21 @@ impl ::std::fmt::Debug for Public {
 #[cfg(feature = "std")]
 impl Serialize for Public {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-		serializer.serialize_str(&self.to_ss58check())
+		// TODO wait until issue https://github.com/paritytech/substrate/issues/2064 fix
+		// serializer.serialize_str(&self.to_ss58check())
+		let h256: H256 = self.clone().into();
+		h256.serialize(serializer)
 	}
 }
 
 #[cfg(feature = "std")]
 impl<'de> Deserialize<'de> for Public {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
-		Public::from_ss58check(&String::deserialize(deserializer)?)
-			.map_err(|e| de::Error::custom(format!("{:?}", e)))
+		// TODO wait until issue https://github.com/paritytech/substrate/issues/2064 fix
+		// Public::from_ss58check(&String::deserialize(deserializer)?)
+		// 	.map_err(|e| de::Error::custom(format!("{:?}", e)))
+		let h256: H256 = H256::deserialize(deserializer)?;
+		Ok(Public::from_h256(h256))
 	}
 }
 
