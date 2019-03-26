@@ -503,7 +503,7 @@ where
 		info!("redis {:?}", connect);
 		use srml_support::storage::redis::init_redis;
 		if let Err(e) = init_redis(&connect){
-			bail!(create_input_err(format!("Redis error!\n{}", e)))
+			bail!(input_err(format!("Redis error!\n{}", e)))
 		};
 	}
 
