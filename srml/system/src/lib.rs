@@ -183,9 +183,14 @@ decl_module! {
 		pub fn deposit_event(event: T::Event) {
 			let extrinsic_index = Self::extrinsic_index();
 			let phase = extrinsic_index.map_or(Phase::Finalization, |c| Phase::ApplyExtrinsic(c));
-			let mut events = Self::events();
-			events.push(EventRecord { phase, event });
-			<Events<T>>::put(events);
+//			let mut events = Self::events();
+//			events.push(EventRecord { phase, event });
+//			<Events<T>>::put(events);
+
+			EventsCacheCount::<T>::mutate(|index| {
+				EventsCache::<T>::insert(*index, EventRecord { phase, event });
+				*index += 1;
+			});
 		}
 	}
 }
@@ -309,6 +314,9 @@ decl_storage! {
 		Digest get(digest): T::Digest;
 		/// Events deposited for the current block.
 		Events get(events): Vec<EventRecord<T::Event>>;
+
+		EventsCache: map u32 => Option<EventRecord<T::Event>>;
+		EventsCacheCount: u32 = 0;
 	}
 	add_extra_genesis {
 		config(changes_trie_config): Option<ChangesTrieConfiguration>;
@@ -394,6 +402,8 @@ impl<T: Trait> Module<T> {
 		<ExtrinsicsRoot<T>>::put(txs_root);
 		<RandomSeed<T>>::put(Self::calculate_random());
 		<Events<T>>::kill();
+
+		<EventsCacheCount<T>>::kill();
 	}
 
 	/// Remove temporary "environment" entries in storage.
@@ -419,7 +429,22 @@ impl<T: Trait> Module<T> {
 
 		// <Events<T>> stays to be inspected by the client.
 
+		// flush all event cache into `Events`
+		Self::flash_events();
+
 		<T::Header as traits::Header>::new(number, extrinsics_root, storage_root, parent_hash, digest)
+	}
+
+	pub fn flash_events() {
+		let mut events = Self::events();
+		for i in 0..EventsCacheCount::<T>::get() {
+			if let Some(e) = EventsCache::<T>::get(i) {
+				events.push(e);
+			}
+			EventsCache::<T>::remove(i);
+		}
+		EventsCacheCount::<T>::kill();
+		<Events<T>>::put(events);
 	}
 
 	/// Deposits a log and ensures it matches the blocks log data.
