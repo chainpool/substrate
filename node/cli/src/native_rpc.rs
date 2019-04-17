@@ -68,10 +68,10 @@ impl Rpc for substrate_service::LightComponents<service::Factory> {
         };
         let rpc_http: Result<Option<rpc::HttpServer>, io::Error> =
             maybe_start_server(config.rpc_http, |address| {
-                rpc::start_http(address, handler())
+                rpc::start_http(address, None, handler())
             });
         let rpc_ws: Result<Option<rpc::WsServer>, io::Error> =
-            maybe_start_server(config.rpc_ws, |address| rpc::start_ws(address, handler()));
+            maybe_start_server(config.rpc_ws, |address| rpc::start_ws(address, None, handler()));
         (rpc_http, rpc_ws)
     }
 }
@@ -111,10 +111,10 @@ impl Rpc for substrate_service::FullComponents<service::Factory> {
         };
         let rpc_http: Result<Option<rpc::HttpServer>, io::Error> =
             maybe_start_server(config.rpc_http, |address| {
-                rpc::start_http(address, handler())
+                rpc::start_http(address, None, handler())
             });
         let rpc_ws: Result<Option<rpc::WsServer>, io::Error> =
-            maybe_start_server(config.rpc_ws, |address| rpc::start_ws(address, handler()));
+            maybe_start_server(config.rpc_ws, |address| rpc::start_ws(address, None, handler()));
         (rpc_http, rpc_ws)
     }
 }
