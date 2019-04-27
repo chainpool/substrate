@@ -23,6 +23,7 @@ lru = { version = "0.1.11", optional = true }
 lazy_static = { version = "1.0", optional = true }
 parking_lot = { version = "*", optional = true }
 log = { version = "0.4", optional = true }
+rustc-hex = { version = "2.0", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
@@ -45,8 +46,18 @@ nightly = []
 strict = []
 
 blocknumber = [ ]
+msgbus = [
+    "blocknumber",
+]
+
+msgbus-log = [
+    "msgbus",
+    "rustc-hex",
+    "log",
+]
+
 msgbus-redis = [
-	"blocknumber",
+	"msgbus",
 	"redis",
 	"lazy_static",
 	"parking_lot",
@@ -55,6 +66,7 @@ msgbus-redis = [
 msgbus-redis-keyhash = [
 	"msgbus-redis"
 ]
+
 cache-lru = [
 	"blocknumber",
 	"lru",

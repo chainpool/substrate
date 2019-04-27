@@ -35,7 +35,7 @@ pub mod redis;
 //#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
 pub mod blocknumber;
 
-#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
+#[cfg(all(feature = "std", any(feature = "msgbus", feature = "cache-lru")))]
 pub fn get_blocknumber() -> Option<u64> {
 	use self::blocknumber::blocknumber_hashedkey;
 	let key = blocknumber_hashedkey();
@@ -109,9 +109,9 @@ pub fn put<T: Encode>(key: &[u8], value: &T) {
 
 	let hash = twox_128(key);
 	unhashed::put(&hash, value);
-	#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
 		use log::info;
-		let blocknumebr = match get_blocknumber() {
+		let blocknumber = match get_blocknumber() {
 			None => {
 				info!("[redis] get_blocknumber in [put] is None");
 				0
@@ -119,7 +119,16 @@ pub fn put<T: Encode>(key: &[u8], value: &T) {
 			Some(b) => b
 		};
 
-		value.using_encoded(|slice| redis::redis_set_with_blocknumer(key, blocknumebr, slice));
+		value.using_encoded(|slice| {
+			#[cfg(all(feature = "std", feature = "msgbus-log"))] {
+				use rustc_hex::ToHex;
+				info!(target: "msgbus", "msgbus|height:[{}]|key:[{}]|value:[{}]", blocknumber, key.to_hex::<String>(), slice.to_hex::<String>());
+			}
+
+			#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+				redis::redis_set_with_blocknumer(key, blocknumber, slice);
+			}
+		});
 
 		#[cfg(all(feature = "std", feature = "msgbus-redis-keyhash"))] {
 			redis::redis_set(&hash, key);
@@ -160,14 +169,22 @@ pub fn kill(key: &[u8]) {
 //	unhashed::kill(&twox_128(key))
 
 	let hash = twox_128(key);
-	#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
 		use log::info;
 		match get_blocknumber() {
 			None => {
 				info!("[redis] get_blocknumber in [kill] is None");
 			}, // when blocknumber is None, due to it's `finalise`, don't remove
 			Some(blocknumber) => {
-				redis::redis_set_with_blocknumer(key, blocknumber, b"");
+				#[cfg(all(feature = "std", feature = "msgbus-log"))] {
+					use rustc_hex::ToHex;
+					info!(target: "msgbus", "msgbus|height:[{}]|key:[{}]|value:[{}]", blocknumber, key.to_hex::<String>(), "");
+				}
+
+				#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+					redis::redis_set_with_blocknumer(key, blocknumber, b"");
+				}
+
 				#[cfg(all(feature = "std", feature = "msgbus-redis-keyhash"))] {
 					redis::redis_set(&hash, key);
 				}

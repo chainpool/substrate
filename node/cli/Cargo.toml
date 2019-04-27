@@ -40,6 +40,9 @@ cli = { package = "substrate-cli", path = "../../core/cli" }
 structopt = "0.2"
 
 [features]
+msgbus-log = [
+	"cli/msgbus-log"
+]
 msgbus-redis = [
 	"cli/msgbus-redis"
 ]
