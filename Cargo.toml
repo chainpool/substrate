@@ -106,6 +106,10 @@ is-it-maintained-open-issues = { repository = "paritytech/substrate" }
 panic = "unwind"
 
 [features]
+msgbus-log = [
+	"cli/msgbus-log"
+]
+
 msgbus-redis = [
 	"cli/msgbus-redis"
 ]

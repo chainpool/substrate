@@ -39,6 +39,10 @@ srml-support = { path = "../../srml/support", optional = true }
 tempdir = "0.3"
 
 [features]
+msgbus-log = [
+	"srml-support/msgbus-log"
+]
+
 msgbus-redis = [
 	"srml-support/msgbus-redis"
 ]
