@@ -21,6 +21,7 @@ use crate::rstd::borrow::Borrow;
 use codec::{Codec, Encode, Decode, KeyedVec, Input, EncodeAppend};
 use hashed::generator::{HashedStorage, StorageHasher};
 use unhashed::generator::UnhashedStorage;
+use runtime_io::twox_128;
 
 #[macro_use]
 pub mod storage_items;
