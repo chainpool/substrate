@@ -48,7 +48,39 @@ pub fn get_or_else<T: Decode + Sized, F: FnOnce() -> T, HashFn: Fn(&[u8]) -> R, 
 
 /// Put `value` in storage under `key`.
 pub fn put<T: Encode, HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8], value: &T) {
-	unhashed::put(&hash(key).as_ref(), value)
+//	unhashed::put(&hash(key).as_ref(), value)
+
+	let hashed_key = hash(key);
+	unhashed::put(&hashed_key.as_ref(), value);
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		use log::info;
+		use super::get_blocknumber;
+
+		let blocknumber = match get_blocknumber(hash) {
+			None => {
+				info!("[msgbus] get_blocknumber in [put] is None");
+				0
+			},
+			Some(b) => b
+		};
+
+		value.using_encoded(|slice| {
+			#[cfg(all(feature = "std", feature = "msgbus-log"))] {
+				use rustc_hex::ToHex;
+				info!(target: "msgbus", "msgbus|height:[{}]|key:[{}]|value:[{}]", blocknumber, key.to_hex::<String>(), slice.to_hex::<String>());
+			}
+
+			#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+				use super::redis::redis_set_with_blocknumer;
+				redis_set_with_blocknumer(key, blocknumber, slice);
+			}
+		});
+
+		#[cfg(all(feature = "std", feature = "msgbus-redis-keyhash"))] {
+			use super::redis::redis_set;
+			redis_set(&hashed_key.as_ref(), key);
+		}
+	}
 }
 
 /// Remove `key` from storage, returning its value if it had an explicit entry or `None` otherwise.
@@ -81,7 +113,36 @@ pub fn exists<HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8])
 
 /// Ensure `key` has no explicit entry in storage.
 pub fn kill<HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8]) {
-	unhashed::kill(&hash(key).as_ref())
+//	unhashed::kill(&hash(key).as_ref())
+
+	let hashed_key = hash(key);
+	unhashed::kill(&hashed_key.as_ref());
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		use log::info;
+		use super::get_blocknumber;
+
+		match get_blocknumber(hash) {
+			None => {
+				info!("[msgbus] get_blocknumber in [kill] is None");
+			}, // when blocknumber is None, due to it's `finalise`, don't remove
+			Some(blocknumber) => {
+				#[cfg(all(feature = "std", feature = "msgbus-log"))] {
+					use rustc_hex::ToHex;
+					info!(target: "msgbus", "msgbus|height:[{}]|key:[{}]|value:[{}]", blocknumber, key.to_hex::<String>(), "");
+				}
+
+				#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+					use super::redis::redis_set_with_blocknumer;
+					redis_set_with_blocknumer(key, blocknumber, b"");
+				}
+
+				#[cfg(all(feature = "std", feature = "msgbus-redis-keyhash"))] {
+					use super::redis::redis_set;
+					redis_set(&hashed_key.as_ref(), key);
+				}
+			}
+		}
+	}
 }
 
 /// Get a Vec of bytes from storage.

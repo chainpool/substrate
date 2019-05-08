@@ -27,6 +27,28 @@ pub mod storage_items;
 pub mod unhashed;
 pub mod hashed;
 
+// related with msgbus & cache
+#[cfg(all(feature = "std", feature = "cache-lru"))]
+use lru;
+
+#[cfg(all(feature = "std", feature = "msgbus-redis"))]
+pub mod redis;
+
+//#[cfg(all(feature = "std", any(feature = "msgbus-redis", feature = "cache-lru")))]
+pub mod blocknumber;
+
+#[cfg(all(feature = "std", any(feature = "msgbus", feature = "cache-lru")))]
+pub fn get_blocknumber<HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn) -> Option<u64> {
+	use self::blocknumber::blocknumber_key;
+
+	let key = blocknumber_key();
+
+	let value: Option<Vec<u8>> = hashed::get_raw(hash, key);
+
+	value.map(|v| Decode::decode(&mut v.as_slice()).expect("storage is not null, therefore must be a valid type") )
+}
+// modify end
+
 struct IncrementalInput<'a> {
 	key: &'a [u8],
 	pos: usize,
