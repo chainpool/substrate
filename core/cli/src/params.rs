@@ -293,6 +293,16 @@ pub struct RunCmd {
 	#[structopt(long = "keystore-path", value_name = "PATH", parse(from_os_str))]
 	pub keystore_path: Option<PathBuf>,
 
+	/// Password for validator key.
+	#[structopt(long = "keystore-password", value_name = "PASSWD")]
+	pub keystore_password: Option<String>,
+
+	/// Interact to input password for keystore to get or generate validator key.
+	/// Notice if there is no keystore in db path or `--keystore-path`, would generate
+	/// a new keypair for keystore.
+	#[structopt(long = "interactive-password", short = "i")]
+	pub interactive_password: bool,
+
 	/// Specify additional key seed
 	#[structopt(long = "key", value_name = "STRING")]
 	pub key: Option<String>,

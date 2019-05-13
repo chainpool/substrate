@@ -37,6 +37,7 @@ use futures::prelude::*;
 use inherents::pool::InherentsPool;
 use keystore::Store as Keystore;
 use log::{info, warn, debug};
+use log::error;
 use parity_codec::{Encode, Decode};
 use primitives::Pair;
 use runtime_primitives::generic::BlockId;
@@ -141,11 +142,21 @@ impl<Components: components::Components> Service<Components> {
 		}
 		// Keep the public key for telemetry
 		let public_key = match keystore.contents()?.get(0) {
-			Some(public_key) => public_key.clone(),
+			Some(public_key) => {
+				let pubkey = public_key.clone();
+				if let Err(e) = keystore.load(&pubkey, &config.keystore_password) {
+					error!("##################### ERROR ############################");
+					error!("can't get key from keystore, may be you input a wrong password!, please check the password, or it would not produce block");
+					error!("current pubkey is:{:?}", pubkey);
+					error!("##################### ERROR ############################");
+					return Err(e.into());
+				}
+				pubkey
+			},
 			None => {
-				let key = keystore.generate("")?;
+				let key = keystore.generate(&config.keystore_password)?;
 				let public_key = key.public();
-				info!("Generated a new keypair: {:?}", public_key);
+				info!("Generated a new keypair for keystore: {:?}", public_key);
 
 				public_key
 			}
@@ -384,8 +395,9 @@ impl<Components: components::Components> Service<Components> {
 		if self.config.roles != Roles::AUTHORITY { return None }
 		let keystore = &self.keystore;
 		if let Ok(Some(Ok(key))) =  keystore.contents().map(|keys| keys.get(0)
-				.map(|k| keystore.load(k, "")))
+				.map(|k| keystore.load(k, &self.config.keystore_password)))
 		{
+			info!("load key from keystore. key:{:?}", key.public());
 			Some(key)
 		} else {
 			None
