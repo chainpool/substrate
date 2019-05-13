@@ -360,8 +360,14 @@ fn fill_network_configuration(
 }
 
 fn input_keystore_password() -> Result<String, String> {
-	rpassword::read_password_from_tty(Some("Keystore password: "))
-		.map_err(|e| format!("{:?}", e))
+ 	let password =
+ 		rpassword::read_password_from_tty(Some("Password: ")).map_err(|e| format!("{:?}", e))?;
+ 	let confirmed_password = rpassword::read_password_from_tty(Some("Repeat again: "))
+ 		.map_err(|e| format!("{:?}", e))?;
+ 	if confirmed_password != password {
+ 		return Err("Password does not match".to_string());
+ 	}
+ 	Ok(password)
 }
 
 fn create_run_node_config<F, S>(
@@ -374,7 +380,16 @@ where
 	let spec = load_spec(&cli.shared_params, spec_factory)?;
 	let mut config = service::Configuration::default_with_spec(spec.clone());
 	if cli.interactive_password {
-		config.password = input_keystore_password()?
+ 		config.keystore_password = input_keystore_password()?
+ 	} else {
+		config.keystore_password = cli.keystore_password.unwrap_or("".to_string());
+	}
+
+	if config.keystore_password != "" || cli.interactive_password {
+		if let Some(_) = cli.key {
+			let msg = "the `-i`(`--interactive-password`) and `--keystore-password` could not cooperate with `--key`".to_string();
+			return Err(error::Error::Input(msg));
+		}
 	}
 
 	config.impl_name = impl_name;
