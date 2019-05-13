@@ -27,6 +27,25 @@ pub mod storage_items;
 pub mod unhashed;
 pub mod hashed;
 
+// related with msgbus & cache
+#[cfg(all(feature = "std", feature = "cache-lru"))]
+use lru;
+
+#[cfg(all(feature = "std", feature = "msgbus-redis"))]
+pub mod redis;
+
+//#[cfg(all(feature = "std", any(feature = "msgbus", feature = "cache-lru")))]
+pub mod blocknumber;
+
+#[cfg(all(feature = "std", any(feature = "msgbus", feature = "cache-lru")))]
+pub fn get_blocknumber() -> Option<u64> {
+	use self::blocknumber::blocknumber_hashedkey;
+
+	let hashed_key = blocknumber_hashedkey();
+	unhashed::get(&hashed_key)
+}
+// modify end
+
 struct IncrementalInput<'a> {
 	key: &'a [u8],
 	pos: usize,

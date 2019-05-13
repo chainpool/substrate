@@ -23,6 +23,39 @@ use crate::rstd::borrow::Borrow;
 use runtime_io::{self, twox_128};
 use crate::codec::{Codec, Encode, Decode, KeyedVec};
 
+#[cfg(all(feature = "std", feature = "msgbus"))]
+#[inline]
+fn msgbus_put(key: &[u8], _hashed_key: &[u8], value: &[u8]) {
+	use log::info;
+	use super::get_blocknumber;
+
+	let blocknumber = match get_blocknumber() {
+		None => {
+			if value == b"" {
+				info!("[msgbus] get_blocknumber in [kill] is None");
+			} else {
+				info!("[msgbus] get_blocknumber in [put] is None");
+			}
+			0
+		},
+		Some(b) => b,
+	};
+	#[cfg(all(feature = "std", feature = "msgbus-log"))] {
+		use rustc_hex::ToHex;
+		info!(target: "msgbus", "msgbus|height:[{}]|key:[{}]|value:[{}]", blocknumber, key.to_hex::<String>(), value.to_hex::<String>());
+	}
+
+	#[cfg(all(feature = "std", feature = "msgbus-redis"))] {
+		use super::redis::redis_set_with_blocknumer;
+		redis_set_with_blocknumer(key, blocknumber, value);
+	}
+
+	#[cfg(all(feature = "std", feature = "msgbus-redis-keyhash"))] {
+		use super::redis::redis_set;
+		redis_set(&_hashed_key.as_ref(), key);
+	}
+}
+
 /// Return the value of the item in storage under `key`, or `None` if there is no explicit entry.
 pub fn get<T: Decode + Sized, HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8]) -> Option<T> {
 	unhashed::get(&hash(key).as_ref())
@@ -48,29 +81,51 @@ pub fn get_or_else<T: Decode + Sized, F: FnOnce() -> T, HashFn: Fn(&[u8]) -> R, 
 
 /// Put `value` in storage under `key`.
 pub fn put<T: Encode, HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8], value: &T) {
-	unhashed::put(&hash(key).as_ref(), value)
+	unhashed::put(&hash(key).as_ref(), value);
+
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		value.using_encoded(|slice| {
+			msgbus_put(key, &hash(key).as_ref(), slice)
+		})
+	}
 }
 
 /// Remove `key` from storage, returning its value if it had an explicit entry or `None` otherwise.
 pub fn take<T: Decode + Sized, HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8]) -> Option<T> {
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		msgbus_put(key, & hash(key).as_ref(), b"")
+	}
+
 	unhashed::take(&hash(key).as_ref())
 }
 
 /// Remove `key` from storage, returning its value, or, if there was no explicit entry in storage,
 /// the default for its type.
 pub fn take_or_default<T: Decode + Sized + Default, HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8]) -> T {
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		msgbus_put(key, &hash(key).as_ref(), b"")
+	}
+
 	unhashed::take_or_default(&hash(key).as_ref())
 }
 
 /// Return the value of the item in storage under `key`, or `default_value` if there is no
 /// explicit entry. Ensure there is no explicit entry on return.
 pub fn take_or<T: Decode + Sized, HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8], default_value: T) -> T {
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		msgbus_put(key, &hash(key).as_ref(), b"")
+	}
+
 	unhashed::take_or(&hash(key).as_ref(), default_value)
 }
 
 /// Return the value of the item in storage under `key`, or `default_value()` if there is no
 /// explicit entry. Ensure there is no explicit entry on return.
 pub fn take_or_else<T: Decode + Sized, F: FnOnce() -> T, HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8], default_value: F) -> T {
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		msgbus_put(key, &hash(key).as_ref(), b"")
+	}
+
 	unhashed::take_or_else(&hash(key).as_ref(), default_value)
 }
 
@@ -81,6 +136,10 @@ pub fn exists<HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8])
 
 /// Ensure `key` has no explicit entry in storage.
 pub fn kill<HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8]) {
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		msgbus_put(key, &hash(key).as_ref(), b"")
+	}
+
 	unhashed::kill(&hash(key).as_ref())
 }
 
@@ -91,7 +150,11 @@ pub fn get_raw<HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8]
 
 /// Put a raw byte slice into storage.
 pub fn put_raw<HashFn: Fn(&[u8]) -> R, R: AsRef<[u8]>>(hash: &HashFn, key: &[u8], value: &[u8]) {
-	unhashed::put_raw(&hash(key).as_ref(), value)
+	unhashed::put_raw(&hash(key).as_ref(), value);
+
+	#[cfg(all(feature = "std", feature = "msgbus"))] {
+		msgbus_put(key, &hash(key).as_ref(), value)
+	}
 }
 
 /// A trait to conveniently store a vector of storable data.
