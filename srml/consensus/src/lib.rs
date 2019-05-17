@@ -318,6 +318,11 @@ decl_module! {
 			storage::unhashed::put_raw(well_known_keys::CODE, &new);
 		}
 
+		/// Set max extrinsics count for transaction pool.
+		fn set_max_extrinsics_count(max_extrinsics_count: u32) {
+			storage::unhashed::put(well_known_keys::MAX_EXTRINSICS_COUNT, &max_extrinsics_count.encode())
+		}
+
 		/// Set some items of storage.
 		fn set_storage(items: Vec<KeyValue>) {
 			for i in &items {
