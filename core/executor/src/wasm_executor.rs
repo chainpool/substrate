@@ -29,6 +29,7 @@ use state_machine::{Externalities, ChildStorageKey};
 use crate::error::{Error, ErrorKind, Result};
 use crate::wasm_utils::UserError;
 use primitives::{blake2_128, blake2_256, twox_64, twox_128, twox_256, ed25519, sr25519, Pair};
+use primitives::hashing::blake2_512;
 use primitives::hexdisplay::HexDisplay;
 use primitives::sandbox as sandbox_primitives;
 use primitives::{H256, Blake2Hasher};
@@ -525,6 +526,15 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 			blake2_256(&[0u8; 0])
 		} else {
 			blake2_256(&this.memory.get(data, len as usize).map_err(|_| UserError("Invalid attempt to get data in ext_blake2_256"))?)
+		};
+		this.memory.set(out, &result).map_err(|_| UserError("Invalid attempt to set result in ext_blake2_256"))?;
+		Ok(())
+	},
+	ext_blake2_512(data: *const u8, len: u32, out: *mut u8) => {
+		let result: [u8; 64] = if len == 0 {
+			blake2_512(&[0u8; 0])
+		} else {
+			blake2_512(&this.memory.get(data, len as usize).map_err(|_| UserError("Invalid attempt to get data in ext_blake2_256"))?)
 		};
 		this.memory.set(out, &result).map_err(|_| UserError("Invalid attempt to set result in ext_blake2_256"))?;
 		Ok(())

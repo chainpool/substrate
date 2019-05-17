@@ -75,6 +75,8 @@ pub use hash_db::Hasher;
 // pub use self::hasher::blake::BlakeHasher;
 pub use self::hasher::blake2::Blake2Hasher;
 
+pub use self::hasher::blake2;
+
 /// Context for executing a call into the runtime.
 #[repr(u8)]
 pub enum ExecutionContext {
