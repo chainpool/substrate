@@ -50,4 +50,21 @@ pub mod blake2 {
 			blake2_256(x).into()
 		}
 	}
+
+	// chainx modify for blake2_512
+	#[cfg(feature = "std")]
+	pub use crate::hashing::blake2_512;
+
+	#[cfg(not(feature = "std"))]
+	extern "C" {
+		fn ext_blake2_512(data: *const u8, len: u32, out: *mut u8);
+	}
+	#[cfg(not(feature = "std"))]
+	pub fn blake2_512(data: &[u8]) -> [u8; 64] {
+		let mut result: [u8; 64] = [0; 64];
+		unsafe {
+			ext_blake2_512(data.as_ptr(), data.len() as u32, result.as_mut_ptr());
+		}
+		result
+	}
 }
