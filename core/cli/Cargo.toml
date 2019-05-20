@@ -35,7 +35,6 @@ names = "0.11.0"
 structopt = "0.2"
 rpassword = "3.0"
 srml-support = { path = "../../srml/support", optional = true }
-rpassword = "3.0"
 
 [dev-dependencies]
 tempdir = "0.3"
