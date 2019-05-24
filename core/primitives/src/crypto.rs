@@ -243,7 +243,8 @@ impl<T: AsMut<[u8]> + AsRef<[u8]> + Default + Derive> Ss58Codec for T {
 			// Invalid length.
 			return Err(PublicError::BadLength);
 		}
-		if d[0] != 42 {
+		// if d[0] != 42 {
+		if d[0] != 44 {
 			// Invalid version.
 			return Err(PublicError::UnknownVersion);
 		}
@@ -257,7 +258,8 @@ impl<T: AsMut<[u8]> + AsRef<[u8]> + Default + Derive> Ss58Codec for T {
 	}
 
 	fn to_ss58check(&self) -> String {
-		let mut v = vec![42u8];
+		// let mut v = vec![42u8];
+		let mut v = vec![44u8];
 		v.extend(self.as_ref());
 		let r = ss58hash(&v);
 		v.extend(&r.as_bytes()[0..2]);
