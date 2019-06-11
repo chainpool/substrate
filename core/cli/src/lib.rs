@@ -187,12 +187,13 @@ fn is_node_name_valid(_name: &str) -> Result<(), &str> {
 /// `RP` is are custom parameters for the run command. This needs to be a `struct`! The custom
 /// parameters are visible to the user as if they were normal run command parameters. If no custom
 /// parameters are required, `NoCustom` can be used as type here.
-pub fn parse_and_execute<'a, F, CC, RP, S, RS, E, I, T>(
+pub fn parse_and_execute<'a, F, CC, RP, S, RS, E, I, T, L>(
 	spec_factory: S,
 	version: &VersionInfo,
 	impl_name: &'static str,
 	args: I,
 	exit: E,
+	init_logger_f: L,
 	run_service: RS,
 ) -> error::Result<Option<CC>>
 where
@@ -201,6 +202,7 @@ where
 	CC: StructOpt + Clone + GetLogFilter,
 	RP: StructOpt + Clone + AugmentClap,
 	E: IntoExit,
+	L: FnOnce(&str, MergeParameters<RunCmd, RP>) -> Result<(), String>,
 	RS: FnOnce(E, RunCmd, RP, FactoryFullConfiguration<F>) -> Result<(), String>,
 	I: IntoIterator<Item = T>,
 	T: Into<std::ffi::OsString> + Clone,
@@ -223,7 +225,12 @@ where
 		.get_matches_from(args);
 	let cli_args = CoreParams::<CC, RP>::from_clap(&matches);
 
-	init_logger(cli_args.get_log_filter().as_ref().map(|v| v.as_ref()).unwrap_or(""));
+	let pattern = cli_args.get_log_filter().clone().unwrap_or("".to_string());
+	match cli_args.clone() {
+		params::CoreParams::Run(params) => init_logger_f(&pattern, params)?,
+		_ => init_logger(&pattern),
+	}
+
 	fdlimit::raise_fd_limit();
 
 	match cli_args {
@@ -779,7 +786,7 @@ fn network_path(base_path: &Path, chain_id: &str) -> PathBuf {
 	path
 }
 
-fn init_logger(pattern: &str) {
+pub fn init_logger(pattern: &str) {
 	use ansi_term::Colour;
 
 	let mut builder = env_logger::Builder::new();
@@ -837,7 +844,7 @@ fn init_logger(pattern: &str) {
 	builder.init();
 }
 
-fn kill_color(s: &str) -> String {
+pub fn kill_color(s: &str) -> String {
 	lazy_static! {
 		static ref RE: Regex = Regex::new("\x1b\\[[^m]+m").expect("Error initializing color regex");
 	}

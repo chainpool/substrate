@@ -3,7 +3,7 @@ use futures::{future, Future, sync::oneshot};
 use std::cell::RefCell;
 use tokio::runtime::Runtime;
 pub use substrate_cli::{VersionInfo, IntoExit, error};
-use substrate_cli::{informant, parse_and_execute, NoCustom};
+use substrate_cli::{informant, parse_and_execute, init_logger, NoCustom};
 use substrate_service::{ServiceFactory, Roles as ServiceRoles};
 use crate::chain_spec;
 use std::ops::Deref;
@@ -15,8 +15,12 @@ pub fn run<I, T, E>(args: I, exit: E, version: VersionInfo) -> error::Result<()>
 	T: Into<std::ffi::OsString> + Clone,
 	E: IntoExit,
 {
-	parse_and_execute::<service::Factory, NoCustom, NoCustom, _, _, _, _, _>(
+	parse_and_execute::<service::Factory, NoCustom, NoCustom, _, _, _, _, _, _>(
 		load_spec, &version, "substrate-node", args, exit,
+		|s, _| {
+			init_logger(s);
+			Ok(())
+		},
 	 	|exit, _cli_args, _custom_args, config| {
 			info!("{}", version.name);
 			info!("  version {}", config.full_version());
