@@ -978,7 +978,8 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			warn!("Safety violation: attempted to revert finalized block {:?} which is not in the \
 				same chain as last finalized {:?}", retracted, last_finalized);
 
-			return Err(error::Error::NotInFinalizedChain);
+			// TODO skip finality check
+			// return Err(error::Error::NotInFinalizedChain);
 		}
 
 		let route_from_best = crate::blockchain::tree_route(

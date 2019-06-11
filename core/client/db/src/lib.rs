@@ -725,9 +725,11 @@ impl<Block: BlockT<Hash=H256>> Backend<Block> {
 	) -> Result<(), client::error::Error> {
 		let last_finalized = last_finalized.unwrap_or_else(|| self.blockchain.meta.read().finalized_hash);
 		if *header.parent_hash() != last_finalized {
-			return Err(::client::error::Error::NonSequentialFinalization(
-				format!("Last finalized {:?} not parent of {:?}", last_finalized, header.hash()),
-			).into());
+			// return Err(::client::error::Error::NonSequentialFinalization(
+			// 	format!("Last finalized {:?} not parent of {:?}", last_finalized, header.hash()),
+			// ).into());
+			// TODO skip finality check!
+			warn!("Last finalized {:?} not parent of {:?}", last_finalized, header.hash());
 		}
 		Ok(())
 	}
