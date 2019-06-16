@@ -72,7 +72,7 @@ use crate::error;
 use crate::in_mem;
 use crate::block_builder::{self, api::BlockBuilder as BlockBuilderAPI};
 use crate::genesis;
-use substrate_telemetry::{telemetry, SUBSTRATE_INFO};
+use substrate_telemetry::{telemetry, SUBSTRATE_INFO, CONSENSUS_INFO};
 
 use log::{info, trace, warn};
 
@@ -799,6 +799,19 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 			"best" => ?hash,
 			"origin" => ?origin
 		);
+		let finalized_number = match self.storage(&BlockId::Hash(hash),
+				&StorageKey(well_known_keys::AURA_FINALIZE.to_vec())) {
+			Ok(Some(number)) => Decode::decode(&mut number.0.as_slice()).unwrap_or(NumberFor::<Block>::zero()),
+			_ => NumberFor::<Block>::zero(),
+		};
+		let finalized_hash = self.block_hash(finalized_number).unwrap_or(None);
+
+		if !finalized_hash.is_none() {
+			telemetry!(CONSENSUS_INFO; "afg.finalized";
+				"finalized_number" => ?finalized_number,
+				"finalized_hash" => ?finalized_hash.unwrap(),
+			);
+		}
 
 		result
 	}
