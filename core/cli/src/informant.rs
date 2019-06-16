@@ -59,7 +59,8 @@ pub fn start<C>(service: &Service<C>, exit: ::exit_future::Exit, handle: TaskExe
 			};
 			last_number = Some(best_number);
 			let txpool_status = txpool.status();
-			let finalized_number: u64 = info.chain.finalized_number.as_();
+			let (finalized_number, finalized_hash) = client.get_finalized_info(best_hash);
+			let finalized_number: u64 = finalized_number.as_();
 			let bandwidth_download = network.average_download_per_sec();
 			let bandwidth_upload = network.average_upload_per_sec();
 			info!(
@@ -71,7 +72,7 @@ pub fn start<C>(service: &Service<C>, exit: ::exit_future::Exit, handle: TaskExe
 				Colour::White.paint(format!("{}", best_number)),
 				best_hash,
 				Colour::White.paint(format!("{}", finalized_number)),
-				info.chain.finalized_hash,
+				finalized_hash.clone().unwrap_or_default(),
 				TransferRateFormat(bandwidth_download),
 				TransferRateFormat(bandwidth_upload),
 			);
@@ -102,7 +103,7 @@ pub fn start<C>(service: &Service<C>, exit: ::exit_future::Exit, handle: TaskExe
 				"cpu" => cpu_usage,
 				"memory" => memory,
 				"finalized_height" => finalized_number,
-				"finalized_hash" => ?info.chain.finalized_hash,
+				"finalized_hash" => ?finalized_hash.unwrap_or_default(),
 				"bandwidth_download" => bandwidth_download,
 				"bandwidth_upload" => bandwidth_upload,
 				"used_state_cache_size" => used_state_cache_size,
