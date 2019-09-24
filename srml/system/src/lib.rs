@@ -91,10 +91,10 @@ use safe_mix::TripletMix;
 use parity_codec::{Encode, Decode};
 
 #[cfg(any(feature = "std", test))]
-use runtime_io::{twox_128, TestExternalities, Blake2Hasher};
+use runtime_io::{twox_128, TestExternalities};
 
 #[cfg(any(feature = "std", test))]
-use substrate_primitives::ChangesTrieConfiguration;
+use substrate_primitives::{ChangesTrieConfiguration, Blake2Hasher};
 
 /// Handler for when a new account has been created.
 pub trait OnNewAccount<AccountId> {

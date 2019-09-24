@@ -82,6 +82,7 @@ pub use hash_db::Hasher;
 pub use self::hasher::blake2::Blake2Hasher;
 
 /// Context for executing a call into the runtime.
+#[repr(u8)]
 pub enum ExecutionContext {
 	/// Context for general importing (including own blocks).
 	Importing,
@@ -93,6 +94,8 @@ pub enum ExecutionContext {
 	///
 	/// This allows passing offchain extension and customizing available capabilities.
 	OffchainCall(Option<(Box<dyn offchain::Externalities>, offchain::Capabilities)>),
+	/// Context used for other calls.
+	Other,
 }
 
 impl ExecutionContext {
@@ -106,6 +109,7 @@ impl ExecutionContext {
 			// Enable keystore by default for offchain calls. CC @bkchr
 			OffchainCall(None) => [offchain::Capability::Keystore][..].into(),
 			OffchainCall(Some((_, capabilities))) => *capabilities,
+			Other => panic!("should not use `Other` for capbilities"),
 		}
 	}
 }

@@ -61,7 +61,7 @@ pub use self::storage::{StorageList, StorageValue, StorageMap, EnumerableStorage
 pub use self::hashable::Hashable;
 pub use self::dispatch::{Parameter, Dispatchable, Callable, IsSubType};
 pub use self::double_map::StorageDoubleMapWithHasher;
-pub use runtime_io::{print, storage_root};
+pub use runtime_io::{storage_root};
 
 #[doc(inline)]
 pub use srml_support_procedural::decl_storage;

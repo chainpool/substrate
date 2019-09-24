@@ -73,7 +73,7 @@ pub fn evaluate_initial<Block: BlockT>(
 	}
 
 	if parent_number.as_() + 1 != proposal.header().number().as_() {
-		bail!(ErrorKind::WrongNumber(parent_number.as_() + 1, proposal.header().number().as_()));
+		bail!(ErrorKind::WrongNumber(parent_number.as_() as u64 + 1, proposal.header().number().as_() as u64));
 	}
 
 	Ok(())

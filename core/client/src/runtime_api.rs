@@ -23,7 +23,7 @@ pub use state_machine::OverlayedChanges;
 #[cfg(feature = "std")]
 pub use primitives::NativeOrEncoded;
 #[doc(hidden)]
-pub use runtime_primitives::{
+pub use sr_primitives::{
 	traits::{
 		AuthorityIdFor, Block as BlockT, GetNodeBlockType, GetRuntimeBlockType,
 		Header as HeaderT, ApiRef, RuntimeApiInfo, Hash as HashT,
@@ -31,7 +31,7 @@ pub use runtime_primitives::{
 	generic::BlockId, transaction_validity::TransactionValidity,
 };
 #[doc(hidden)]
-pub use primitives::{ExecutionContext, OffchainExt};
+pub use primitives::{offchain, ExecutionContext};
 #[doc(hidden)]
 pub use runtime_version::{ApiId, RuntimeVersion, ApisVec, create_apis_vec};
 #[doc(hidden)]
@@ -39,14 +39,13 @@ pub use rstd::{slice, mem};
 #[cfg(feature = "std")]
 use rstd::result;
 #[doc(hidden)]
-pub use parity_codec::{Encode, Decode};
+pub use codec::{Encode, Decode};
 #[cfg(feature = "std")]
 use crate::error;
 use sr_api_macros::decl_runtime_apis;
 use primitives::OpaqueMetadata;
 #[cfg(feature = "std")]
 use std::{panic::UnwindSafe, cell::RefCell, rc::Rc};
-use rstd::vec::Vec;
 #[cfg(feature = "std")]
 use primitives::Hasher as HasherT;
 
