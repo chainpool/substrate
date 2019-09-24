@@ -15,7 +15,7 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 use rstd::prelude::*;
-use rstd::{slice, marker, mem};
+use rstd::{slice, marker, mem, vec};
 use rstd::rc::Rc;
 use codec::{Decode, Encode};
 use primitives::sandbox as sandbox_primitives;
@@ -33,7 +33,7 @@ mod ffi {
 	/// # Safety
 	///
 	/// This function should be only called with a `HostFuncIndex` that was previously registered
-	/// in the environment defintion. Typically this should only
+	/// in the environment definition. Typically this should only
 	/// be called with an argument received in `dispatch_thunk`.
 	pub unsafe fn coerce_host_index_to_func<T>(idx: HostFuncIndex) -> HostFuncType<T> {
 		// We need to ensure that sizes of a callable function pointer and host function index is
@@ -304,7 +304,7 @@ impl<T> Instance<T> {
 		match result {
 			sandbox_primitives::ERR_OK => {
 				let return_val = sandbox_primitives::ReturnValue::decode(&mut &return_val[..])
-					.ok_or(Error::Execution)?;
+					.map_err(|_| Error::Execution)?;
 				Ok(return_val)
 			}
 			sandbox_primitives::ERR_EXECUTION => Err(Error::Execution),
