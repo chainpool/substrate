@@ -22,7 +22,7 @@ use runtime_io;
 #[cfg(feature = "std")] use std::fmt::{Debug, Display};
 #[cfg(feature = "std")] use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use substrate_primitives::{self, Hasher, Blake2Hasher};
-use crate::codec::{Codec, Encode, HasCompact};
+use crate::codec::{Codec, Encode, Decode, HasCompact};
 use crate::transaction_validity::TransactionValidity;
 pub use integer_sqrt::IntegerSquareRoot;
 pub use num_traits::{
@@ -57,14 +57,14 @@ pub trait Verify {
 impl Verify for substrate_primitives::ed25519::Signature {
 	type Signer = substrate_primitives::ed25519::Public;
 	fn verify<L: Lazy<[u8]>>(&self, mut msg: L, signer: &Self::Signer) -> bool {
-		runtime_io::ed25519_verify(self.as_ref(), msg.get(), signer)
+		runtime_io::ed25519_verify(self, msg.get(), signer)
 	}
 }
 
 impl Verify for substrate_primitives::sr25519::Signature {
 	type Signer = substrate_primitives::sr25519::Public;
 	fn verify<L: Lazy<[u8]>>(&self, mut msg: L, signer: &Self::Signer) -> bool {
-		runtime_io::sr25519_verify(self.as_ref(), msg.get(), signer)
+		runtime_io::sr25519_verify(self, msg.get(), signer)
 	}
 }
 
@@ -327,10 +327,12 @@ macro_rules! tuple_impl {
 tuple_impl!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z,);
 
 /// Abstraction around hashing
-pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {	// Stupid bug in the Rust compiler believes derived
-																	// traits must be fulfilled by all type parameters.
+// Stupid bug in the Rust compiler believes derived
+// traits must be fulfilled by all type parameters.
+pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {
 	/// The hash type produced.
-	type Output: Member + MaybeSerializeDebug + rstd::hash::Hash + AsRef<[u8]> + AsMut<[u8]> + Copy + Default;
+	type Output: Member + MaybeSerializeDebug + rstd::hash::Hash + AsRef<[u8]> + AsMut<[u8]> + Copy
+	+ Default + Encode + Decode;
 
 	/// The associated hash_db Hasher type.
 	type Hasher: Hasher<Out=Self::Output>;
@@ -339,31 +341,21 @@ pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {	// Stup
 	fn hash(s: &[u8]) -> Self::Output;
 
 	/// Produce the hash of some codec-encodable value.
-	fn hash_of<S: Codec>(s: &S) -> Self::Output {
+	fn hash_of<S: Encode>(s: &S) -> Self::Output {
 		Encode::using_encoded(s, Self::hash)
 	}
 
-	/// Produce the trie-db root of a mapping from indices to byte slices.
-	fn enumerated_trie_root(items: &[&[u8]]) -> Self::Output;
+	/// The ordered Patricia tree root of the given `input`.
+	fn ordered_trie_root(input: Vec<Vec<u8>>) -> Self::Output;
 
-	/// Iterator-based version of `enumerated_trie_root`.
-	fn ordered_trie_root<
-		I: IntoIterator<Item = A> + Iterator<Item = A>,
-		A: AsRef<[u8]>
-	>(input: I) -> Self::Output;
-
-	/// The Patricia tree root of the given mapping as an iterator.
-	fn trie_root<
-		I: IntoIterator<Item = (A, B)>,
-		A: AsRef<[u8]> + Ord,
-		B: AsRef<[u8]>
-	>(input: I) -> Self::Output;
+	/// The Patricia tree root of the given mapping.
+	fn trie_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> Self::Output;
 
 	/// Acquire the global storage root.
 	fn storage_root() -> Self::Output;
 
 	/// Acquire the global storage changes root.
-	fn storage_changes_root(parent_hash: Self::Output, parent_number: u64) -> Option<Self::Output>;
+	fn storage_changes_root(parent_hash: Self::Output) -> Option<Self::Output>;
 }
 
 /// Blake2-256 Hash implementation.
@@ -377,27 +369,21 @@ impl Hash for BlakeTwo256 {
 	fn hash(s: &[u8]) -> Self::Output {
 		runtime_io::blake2_256(s).into()
 	}
-	fn enumerated_trie_root(items: &[&[u8]]) -> Self::Output {
-		runtime_io::enumerated_trie_root::<Blake2Hasher>(items).into()
+
+	fn trie_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> Self::Output {
+		runtime_io::blake2_256_trie_root(input)
 	}
-	fn trie_root<
-		I: IntoIterator<Item = (A, B)>,
-		A: AsRef<[u8]> + Ord,
-		B: AsRef<[u8]>
-	>(input: I) -> Self::Output {
-		runtime_io::trie_root::<Blake2Hasher, _, _, _>(input).into()
+
+	fn ordered_trie_root(input: Vec<Vec<u8>>) -> Self::Output {
+		runtime_io::blake2_256_ordered_trie_root(input)
 	}
-	fn ordered_trie_root<
-		I: IntoIterator<Item = A> + Iterator<Item = A>,
-		A: AsRef<[u8]>
-	>(input: I) -> Self::Output {
-		runtime_io::ordered_trie_root::<Blake2Hasher, _, _>(input).into()
-	}
+
 	fn storage_root() -> Self::Output {
 		runtime_io::storage_root().into()
 	}
-	fn storage_changes_root(parent_hash: Self::Output, parent_number: u64) -> Option<Self::Output> {
-		runtime_io::storage_changes_root(parent_hash.into(), parent_number).map(Into::into)
+
+	fn storage_changes_root(parent_hash: Self::Output) -> Option<Self::Output> {
+		runtime_io::storage_changes_root(parent_hash.into()).map(Into::into)
 	}
 }
 

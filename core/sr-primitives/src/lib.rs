@@ -29,8 +29,7 @@ pub use serde;
 #[cfg(feature = "std")]
 pub use runtime_io::{StorageOverlay, ChildrenStorageOverlay};
 
-use rstd::prelude::*;
-use rstd::ops;
+use rstd::{prelude::*, ops, convert::{TryInto, TryFrom}};
 use substrate_primitives::{crypto, ed25519, sr25519, hash::{H256, H512}};
 use codec::{Encode, Decode};
 
@@ -456,8 +455,13 @@ pub struct AnySignature(H512);
 impl Verify for AnySignature {
 	type Signer = sr25519::Public;
 	fn verify<L: Lazy<[u8]>>(&self, mut msg: L, signer: &sr25519::Public) -> bool {
-		runtime_io::sr25519_verify(self.0.as_fixed_bytes(), msg.get(), &signer.0) ||
-			runtime_io::ed25519_verify(self.0.as_fixed_bytes(), msg.get(), &signer.0)
+		sr25519::Signature::try_from(self.0.as_fixed_bytes().as_ref())
+			.map(|s| runtime_io::sr25519_verify(&s, msg.get(), &signer))
+			.unwrap_or(false)
+			|| ed25519::Signature::try_from(self.0.as_fixed_bytes().as_ref())
+			.and_then(|s| ed25519::Public::try_from(signer.0.as_ref()).map(|p| (s, p)))
+			.map(|(s, p)| runtime_io::ed25519_verify(&s, msg.get(), &p))
+			.unwrap_or(false)
 	}
 }
 
