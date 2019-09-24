@@ -21,23 +21,32 @@ pub struct HexDisplay<'a>(&'a [u8]);
 
 impl<'a> HexDisplay<'a> {
 	/// Create new instance that will display `d` as a hex string when displayed.
-	pub fn from(d: &'a AsBytesRef) -> Self { HexDisplay(d.as_bytes_ref()) }
+	pub fn from<R: AsBytesRef>(d: &'a R) -> Self { HexDisplay(d.as_bytes_ref()) }
 }
 
 impl<'a> ::core::fmt::Display for HexDisplay<'a> {
-	fn fmt(&self, fmtr: &mut ::core::fmt::Formatter) -> Result<(), ::core::fmt::Error> {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
 		if self.0.len() < 1027 {
 			for byte in self.0 {
-				fmtr.write_fmt(format_args!("{:02x}", byte))?;
+				f.write_fmt(format_args!("{:02x}", byte))?;
 			}
 		} else {
 			for byte in &self.0[0..512] {
-				fmtr.write_fmt(format_args!("{:02x}", byte))?;
+				f.write_fmt(format_args!("{:02x}", byte))?;
 			}
-			fmtr.write_str("...")?;
+			f.write_str("...")?;
 			for byte in &self.0[self.0.len() - 512..] {
-				fmtr.write_fmt(format_args!("{:02x}", byte))?;
+				f.write_fmt(format_args!("{:02x}", byte))?;
 			}
+		}
+		Ok(())
+	}
+}
+
+impl<'a> core::fmt::Debug for HexDisplay<'a> {
+	fn fmt(&self, f: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
+		for byte in self.0 {
+			f.write_fmt(format_args!("{:02x}", byte))?;
 		}
 		Ok(())
 	}
@@ -79,7 +88,7 @@ pub fn ascii_format(asciish: &[u8]) -> String {
 	let mut latch = false;
 	for c in asciish {
 		match (latch, *c) {
-			(false, 32...127) => r.push(*c as char),
+			(false, 32..=127) => r.push(*c as char),
 			_ => {
 				if !latch {
 					r.push('#');

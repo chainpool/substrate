@@ -29,10 +29,12 @@
 use hash_db::Hasher;
 use rstd::vec::Vec;
 
-#[doc(hidden)]
-pub use codec;
-
-pub use primitives::Blake2Hasher;
+use primitives::{
+	crypto::KeyTypeId, ed25519, sr25519, H256,
+	offchain::{
+		Timestamp, HttpRequestId, HttpRequestStatus, HttpError, StorageKind, OpaqueNetworkState,
+	},
+};
 
 /// Error verifying ECDSA signature
 pub enum EcdsaVerifyError {
@@ -44,11 +46,7 @@ pub enum EcdsaVerifyError {
 	BadSignature,
 }
 
-/// Trait for things which can be printed.
-pub trait Printable {
-	/// Print the object.
-	fn print(self);
-}
+pub mod offchain;
 
 /// Converts a public trait definition into a private trait and set of public functions
 /// that assume the trait is implemented for `()` for ease of calling.
@@ -59,8 +57,7 @@ macro_rules! export_api {
 			$(
 				$( #[$attr:meta] )*
 				fn $name:ident
-					$(< $( $g_name:ident $( : $g_ty:path )? ),+ >)?
-					( $( $arg:ident : $arg_ty:ty ),* )
+					( $( $arg:ident : $arg_ty:ty ),* $(,)? )
 					$( -> $ret:ty )?
 					$( where $( $w_name:path : $w_ty:path ),+ )?;
 			)*
@@ -70,18 +67,18 @@ macro_rules! export_api {
 		pub(crate) trait $trait_name {
 			$(
 				$( #[$attr] )*
-				fn $name $(< $( $g_name $( : $g_ty )? ),+ >)? ( $($arg : $arg_ty ),* ) $( -> $ret )?
+				fn $name ( $($arg : $arg_ty ),* ) $( -> $ret )?
 				$( where $( $w_name : $w_ty ),+ )?;
 			)*
 		}
 
 		$(
 			$( #[$attr] )*
-			pub fn $name $(< $( $g_name $( : $g_ty )? ),+ >)? ( $($arg : $arg_ty ),* ) $( -> $ret )?
+			pub fn $name ( $($arg : $arg_ty ),* ) $( -> $ret )?
 				$( where $( $w_name : $w_ty ),+ )?
 			{
 				#[allow(deprecated)]
-				<()>:: $name $(::< $( $g_name ),+ > )?  ( $( $arg ),* )
+				<()>:: $name ( $( $arg ),* )
 			}
 		)*
 	}
@@ -95,16 +92,18 @@ export_api! {
 		/// Get `key` from child storage and return a `Vec`, empty if there's a problem.
 		fn child_storage(storage_key: &[u8], key: &[u8]) -> Option<Vec<u8>>;
 
-		/// Get `key` from storage, placing the value into `value_out` (as much of it as possible) and return
-		/// the number of bytes that the entry in storage had beyond the offset or None if the storage entry
-		/// doesn't exist at all. Note that if the buffer is smaller than the storage entry length, the returned
-		/// number of bytes is not equal to the number of bytes written to the `value_out`.
+		/// Get `key` from storage, placing the value into `value_out` and return the number of
+		/// bytes that the entry in storage has beyond the offset or `None` if the storage entry
+		/// doesn't exist at all.
+		/// If `value_out` length is smaller than the returned length, only `value_out` length bytes
+		/// are copied into `value_out`.
 		fn read_storage(key: &[u8], value_out: &mut [u8], value_offset: usize) -> Option<usize>;
 
-		/// Get `key` from child storage, placing the value into `value_out` (as much of it as possible) and return
-		/// the number of bytes that the entry in storage had beyond the offset or None if the storage entry
-		/// doesn't exist at all. Note that if the buffer is smaller than the storage entry length, the returned
-		/// number of bytes is not equal to the number of bytes written to the `value_out`.
+		/// Get `key` from child storage, placing the value into `value_out` and return the number
+		/// of bytes that the entry in storage has beyond the offset or `None` if the storage entry
+		/// doesn't exist at all.
+		/// If `value_out` length is smaller than the returned length, only `value_out` length bytes
+		/// are copied into `value_out`.
 		fn read_child_storage(storage_key: &[u8], key: &[u8], value_out: &mut [u8], value_offset: usize) -> Option<usize>;
 
 		/// Set the storage of some particular key to Some value.
@@ -131,6 +130,9 @@ export_api! {
 		/// Clear the storage entries with a key that starts with the given prefix.
 		fn clear_prefix(prefix: &[u8]);
 
+		/// Clear the child storage entries with a key that starts with the given prefix.
+		fn clear_child_prefix(storage_key: &[u8], prefix: &[u8]);
+
 		/// "Commit" all existing operations and compute the resultant storage root.
 		fn storage_root() -> [u8; 32];
 
@@ -138,38 +140,13 @@ export_api! {
 		fn child_storage_root(storage_key: &[u8]) -> Vec<u8>;
 
 		/// "Commit" all existing operations and get the resultant storage change root.
-		fn storage_changes_root(parent_hash: [u8; 32], parent_num: u64) -> Option<[u8; 32]>;
-
-		/// A trie root formed from the enumerated items.
-		/// TODO [#2382] remove (just use `ordered_trie_root` (NOTE currently not implemented for without_std))
-		fn enumerated_trie_root<H>(input: &[&[u8]]) -> H::Out
-		where
-			H: Hasher,
-			H: self::imp::HasherBounds,
-			H::Out: Ord
-		;
+		fn storage_changes_root(parent_hash: [u8; 32]) -> Option<[u8; 32]>;
 
 		/// A trie root formed from the iterated items.
-		fn trie_root<H, I, A, B>(input: I) -> H::Out
-		where
-			I: IntoIterator<Item = (A, B)>,
-			A: AsRef<[u8]>,
-			A: Ord,
-			B: AsRef<[u8]>,
-			H: Hasher,
-			H: self::imp::HasherBounds,
-			H::Out: Ord
-		;
+		fn blake2_256_trie_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> H256;
 
 		/// A trie root formed from the enumerated items.
-		fn ordered_trie_root<H, I, A>(input: I) -> H::Out
-		where
-			I: IntoIterator<Item = A>,
-			A: AsRef<[u8]>,
-			H: Hasher,
-			H: self::imp::HasherBounds,
-			H::Out: Ord
-		;
+		fn blake2_256_ordered_trie_root(input: Vec<Vec<u8>>) -> H256;
 	}
 }
 
@@ -178,22 +155,56 @@ export_api! {
 		/// The current relay chain identifier.
 		fn chain_id() -> u64;
 
-		/// Print a printable value.
-		fn print<T>(value: T)
-		where
-			T: Printable,
-			T: Sized
-		;
+		/// Print a number.
+		fn print_num(val: u64);
+		/// Print any valid `utf8` buffer.
+		fn print_utf8(utf8: &[u8]);
+		/// Print any `u8` slice as hex.
+		fn print_hex(data: &[u8]);
 	}
 }
 
 export_api! {
 	pub(crate) trait CryptoApi {
-		/// Verify a ed25519 signature.
-		fn ed25519_verify<P: AsRef<[u8]>>(sig: &[u8; 64], msg: &[u8], pubkey: P) -> bool;
+		/// Returns all ed25519 public keys for the given key id from the keystore.
+		fn ed25519_public_keys(id: KeyTypeId) -> Vec<ed25519::Public>;
+		/// Generate an ed22519 key for the given key type and store it in the keystore.
+		///
+		/// Returns the raw public key.
+		fn ed25519_generate(id: KeyTypeId, seed: Option<&str>) -> ed25519::Public;
+		/// Sign the given `msg` with the ed25519 key that corresponds to the given public key and
+		/// key type in the keystore.
+		///
+		/// Returns the raw signature.
+		fn ed25519_sign(
+			id: KeyTypeId,
+			pubkey: &ed25519::Public,
+			msg: &[u8],
+		) -> Option<ed25519::Signature>;
+		/// Verify an ed25519 signature.
+		///
+		/// Returns `true` when the verification in successful.
+		fn ed25519_verify(sig: &ed25519::Signature, msg: &[u8], pubkey: &ed25519::Public) -> bool;
 
+		/// Returns all sr25519 public keys for the given key id from the keystore.
+		fn sr25519_public_keys(id: KeyTypeId) -> Vec<sr25519::Public>;
+		/// Generate an sr22519 key for the given key type and store it in the keystore.
+		///
+		/// Returns the raw public key.
+		fn sr25519_generate(id: KeyTypeId, seed: Option<&str>) -> sr25519::Public;
+		/// Sign the given `msg` with the sr25519 key that corresponds to the given public key and
+		/// key type in the keystore.
+		///
+		/// Returns the raw signature.
+		fn sr25519_sign(
+			id: KeyTypeId,
+			pubkey: &sr25519::Public,
+			msg: &[u8],
+		) -> Option<sr25519::Signature>;
 		/// Verify an sr25519 signature.
-		fn sr25519_verify<P: AsRef<[u8]>>(sig: &[u8; 64], msg: &[u8], pubkey: P) -> bool;
+		///
+		/// Returns `true` when the verification in successful.
+		fn sr25519_verify(sig: &sr25519::Signature, msg: &[u8], pubkey: &sr25519::Public) -> bool;
 
 		/// Verify and recover a SECP256k1 ECDSA signature.
 		/// - `sig` is passed in RSV format. V should be either 0/1 or 27/28.
@@ -226,12 +237,121 @@ export_api! {
 
 export_api! {
 	pub(crate) trait OffchainApi {
-		/// Submit extrinsic from the runtime.
+		/// Returns if the local node is a potential validator.
 		///
-		/// Depending on the kind of extrinsic it will either be:
-		/// 1. scheduled to be included in the next produced block (inherent)
-		/// 2. added to the pool and propagated (transaction)
-		fn submit_extrinsic<T: codec::Encode>(data: &T);
+		/// Even if this function returns `true`, it does not mean that any keys are configured
+		/// and that the validator is registered in the chain.
+		fn is_validator() -> bool;
+
+		/// Submit transaction to the pool.
+		///
+		/// The transaction will end up in the pool.
+		fn submit_transaction(data: Vec<u8>) -> Result<(), ()>;
+
+		/// Returns information about the local node's network state.
+		fn network_state() -> Result<OpaqueNetworkState, ()>;
+
+		/// Returns current UNIX timestamp (in millis)
+		fn timestamp() -> Timestamp;
+
+		/// Pause the execution until `deadline` is reached.
+		fn sleep_until(deadline: Timestamp);
+
+		/// Returns a random seed.
+		///
+		/// This is a trully random non deterministic seed generated by host environment.
+		/// Obviously fine in the off-chain worker context.
+		fn random_seed() -> [u8; 32];
+
+		/// Sets a value in the local storage.
+		///
+		/// Note this storage is not part of the consensus, it's only accessible by
+		/// offchain worker tasks running on the same machine. It IS persisted between runs.
+		fn local_storage_set(kind: StorageKind, key: &[u8], value: &[u8]);
+
+		/// Sets a value in the local storage if it matches current value.
+		///
+		/// Since multiple offchain workers may be running concurrently, to prevent
+		/// data races use CAS to coordinate between them.
+		///
+		/// Returns `true` if the value has been set, `false` otherwise.
+		///
+		/// Note this storage is not part of the consensus, it's only accessible by
+		/// offchain worker tasks running on the same machine. It IS persisted between runs.
+		fn local_storage_compare_and_set(
+			kind: StorageKind,
+			key: &[u8],
+			old_value: Option<&[u8]>,
+			new_value: &[u8],
+		) -> bool;
+
+		/// Gets a value from the local storage.
+		///
+		/// If the value does not exist in the storage `None` will be returned.
+		/// Note this storage is not part of the consensus, it's only accessible by
+		/// offchain worker tasks running on the same machine. It IS persisted between runs.
+		fn local_storage_get(kind: StorageKind, key: &[u8]) -> Option<Vec<u8>>;
+
+		/// Initiates a http request given HTTP verb and the URL.
+		///
+		/// Meta is a future-reserved field containing additional, parity-scale-codec encoded parameters.
+		/// Returns the id of newly started request.
+		fn http_request_start(
+			method: &str,
+			uri: &str,
+			meta: &[u8],
+		) -> Result<HttpRequestId, ()>;
+
+		/// Append header to the request.
+		fn http_request_add_header(
+			request_id: HttpRequestId,
+			name: &str,
+			value: &str,
+		) -> Result<(), ()>;
+
+		/// Write a chunk of request body.
+		///
+		/// Writing an empty chunks finalises the request.
+		/// Passing `None` as deadline blocks forever.
+		///
+		/// Returns an error in case deadline is reached or the chunk couldn't be written.
+		fn http_request_write_body(
+			request_id: HttpRequestId,
+			chunk: &[u8],
+			deadline: Option<Timestamp>,
+		) -> Result<(), HttpError>;
+
+		/// Block and wait for the responses for given requests.
+		///
+		/// Returns a vector of request statuses (the len is the same as ids).
+		/// Note that if deadline is not provided the method will block indefinitely,
+		/// otherwise unready responses will produce `DeadlineReached` status.
+		///
+		/// Passing `None` as deadline blocks forever.
+		fn http_response_wait(
+			ids: &[HttpRequestId],
+			deadline: Option<Timestamp>,
+		) -> Vec<HttpRequestStatus>;
+
+		/// Read all response headers.
+		///
+		/// Returns a vector of pairs `(HeaderKey, HeaderValue)`.
+		/// NOTE response headers have to be read before response body.
+		fn http_response_headers(request_id: HttpRequestId) -> Vec<(Vec<u8>, Vec<u8>)>;
+
+		/// Read a chunk of body response to given buffer.
+		///
+		/// Returns the number of bytes written or an error in case a deadline
+		/// is reached or server closed the connection.
+		/// If `0` is returned it means that the response has been fully consumed
+		/// and the `request_id` is now invalid.
+		/// NOTE this implies that response headers must be read before draining the body.
+		/// Passing `None` as a deadline blocks forever.
+		fn http_response_read_body(
+			request_id: HttpRequestId,
+			buffer: &mut [u8],
+			deadline: Option<Timestamp>,
+		) -> Result<usize, HttpError>;
 	}
 }
 
@@ -251,6 +371,13 @@ mod imp {
 }
 
 #[cfg(feature = "std")]
-pub use self::imp::{StorageOverlay, ChildrenStorageOverlay, with_storage, with_externalities, TestExternalities};
+pub use self::imp::{
+	StorageOverlay, ChildrenStorageOverlay, with_storage,
+	with_externalities
+};
 #[cfg(not(feature = "std"))]
 pub use self::imp::ext::*;
+
+/// Type alias for Externalities implementation used in tests.
+#[cfg(feature = "std")]
+pub type TestExternalities<H> = self::imp::TestExternalities<H, u64>;

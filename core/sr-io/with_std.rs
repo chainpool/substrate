@@ -15,23 +15,17 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 use primitives::{
-	blake2_128, blake2_256, twox_128, twox_256, twox_64, ed25519, Blake2Hasher,
-	sr25519, Pair
+	blake2_128, blake2_256, twox_128, twox_256, twox_64, ed25519, Blake2Hasher, sr25519, Pair, H256,
+	traits::Externalities, child_storage_key::ChildStorageKey, hexdisplay::HexDisplay, offchain,
 };
 // Switch to this after PoC-3
 // pub use primitives::BlakeHasher;
-pub use substrate_state_machine::{
-	Externalities,
-	BasicExternalities,
-	TestExternalities,
-	ChildStorageKey
-};
+pub use substrate_state_machine::{BasicExternalities, TestExternalities};
 
 use environmental::environmental;
-use primitives::{hexdisplay::HexDisplay, H256};
+use trie::{TrieConfiguration, trie_types::Layout};
 
-#[cfg(feature = "std")]
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
 
 environmental!(ext: trait Externalities<Blake2Hasher>);
 
@@ -44,7 +38,7 @@ impl<T: Hasher> HasherBounds for T {}
 ///
 /// Panicking here is aligned with what the `without_std` environment would do
 /// in the case of an invalid child storage key.
-fn child_storage_key_or_panic(storage_key: &[u8]) -> ChildStorageKey<Blake2Hasher> {
+fn child_storage_key_or_panic(storage_key: &[u8]) -> ChildStorageKey {
 	match ChildStorageKey::from_slice(storage_key) {
 		Some(storage_key) => storage_key,
 		None => panic!("child storage key is invalid"),
@@ -59,9 +53,9 @@ impl StorageApi for () {
 
 	fn read_storage(key: &[u8], value_out: &mut [u8], value_offset: usize) -> Option<usize> {
 		ext::with(|ext| ext.storage(key).map(|value| {
-			let value = &value[value_offset..];
-			let written = std::cmp::min(value.len(), value_out.len());
-			value_out[..written].copy_from_slice(&value[..written]);
+			let data = &value[value_offset.min(value.len())..];
+			let written = std::cmp::min(data.len(), value_out.len());
+			value_out[..written].copy_from_slice(&data[..written]);
 			value.len()
 		})).expect("read_storage cannot be called outside of an Externalities-provided environment.")
 	}
@@ -90,9 +84,9 @@ impl StorageApi for () {
 			let storage_key = child_storage_key_or_panic(storage_key);
 			ext.child_storage(storage_key, key)
 				.map(|value| {
-					let value = &value[value_offset..];
-					let written = std::cmp::min(value.len(), value_out.len());
-					value_out[..written].copy_from_slice(&value[..written]);
+					let data = &value[value_offset.min(value.len())..];
+					let written = std::cmp::min(data.len(), value_out.len());
+					value_out[..written].copy_from_slice(&data[..written]);
 					value.len()
 				})
 		})
@@ -145,6 +139,13 @@ impl StorageApi for () {
 		);
 	}
 
+	fn clear_child_prefix(storage_key: &[u8], prefix: &[u8]) {
+		ext::with(|ext| {
+			let storage_key = child_storage_key_or_panic(storage_key);
+			ext.clear_child_prefix(storage_key, prefix)
+		});
+	}
+
 	fn storage_root() -> [u8; 32] {
 		ext::with(|ext|
 			ext.storage_root()
@@ -158,39 +159,18 @@ impl StorageApi for () {
 		}).expect("child_storage_root cannot be called outside of an Externalities-provided environment.")
 	}
 
-	fn storage_changes_root(parent_hash: [u8; 32], parent_num: u64) -> Option<[u8; 32]> {
+	fn storage_changes_root(parent_hash: [u8; 32]) -> Option<[u8; 32]> {
 		ext::with(|ext|
-			ext.storage_changes_root(parent_hash.into(), parent_num).map(Into::into)
-		).unwrap_or(None)
+			ext.storage_changes_root(parent_hash.into()).map(|h| h.map(|h| h.into()))
+		).unwrap_or(Ok(None)).expect("Invalid parent hash passed to storage_changes_root")
 	}
 
-	fn enumerated_trie_root<H>(input: &[&[u8]]) -> H::Out
-	where
-		H: Hasher,
-		H::Out: Ord,
-	{
-		trie::ordered_trie_root::<H, _, _>(input.iter())
+	fn blake2_256_trie_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> H256 {
+		Layout::<Blake2Hasher>::trie_root(input)
 	}
 
-	fn trie_root<H, I, A, B>(input: I) -> H::Out
-	where
-		I: IntoIterator<Item = (A, B)>,
-		A: AsRef<[u8]> + Ord,
-		B: AsRef<[u8]>,
-		H: Hasher,
-		H::Out: Ord,
-	{
-		trie::trie_root::<H, _, _, _>(input)
-	}
-
-	fn ordered_trie_root<H, I, A>(input: I) -> H::Out
-	where
-		I: IntoIterator<Item = A>,
-		A: AsRef<[u8]>,
-		H: Hasher,
-		H::Out: Ord,
-	{
-		trie::ordered_trie_root::<H, _, _>(input)
+	fn blake2_256_ordered_trie_root(input: Vec<Vec<u8>>) -> H256 {
+		Layout::<Blake2Hasher>::ordered_trie_root(input)
 	}
 }
 
@@ -201,24 +181,107 @@ impl OtherApi for () {
 		).unwrap_or(0)
 	}
 
-	fn print<T: Printable + Sized>(value: T) {
-		value.print()
+	fn print_num(val: u64) {
+		println!("{}", val);
+	}
+
+	fn print_utf8(utf8: &[u8]) {
+		if let Ok(data) = std::str::from_utf8(utf8) {
+			println!("{}", data)
+		}
+	}
+
+	fn print_hex(data: &[u8]) {
+		println!("{}", HexDisplay::from(&data));
 	}
 }
 
 impl CryptoApi for () {
-	fn ed25519_verify<P: AsRef<[u8]>>(sig: &[u8; 64], msg: &[u8], pubkey: P) -> bool {
-		ed25519::Pair::verify_weak(sig, msg, pubkey)
+	fn ed25519_public_keys(id: KeyTypeId) -> Vec<ed25519::Public> {
+		ext::with(|ext| {
+			ext.keystore()
+				.expect("No `keystore` associated for the current context!")
+				.read()
+				.ed25519_public_keys(id)
+		}).expect("`ed25519_public_keys` cannot be called outside of an Externalities-provided environment.")
 	}
 
-	fn sr25519_verify<P: AsRef<[u8]>>(sig: &[u8; 64], msg: &[u8], pubkey: P) -> bool {
-		sr25519::Pair::verify_weak(sig, msg, pubkey)
+	fn ed25519_generate(id: KeyTypeId, seed: Option<&str>) -> ed25519::Public {
+		ext::with(|ext| {
+			ext.keystore()
+				.expect("No `keystore` associated for the current context!")
+				.write()
+				.ed25519_generate_new(id, seed)
+				.expect("`ed25519_generate` failed")
+		}).expect("`ed25519_generate` cannot be called outside of an Externalities-provided environment.")
+	}
+
+	fn ed25519_sign(
+		id: KeyTypeId,
+		pubkey: &ed25519::Public,
+		msg: &[u8],
+	) -> Option<ed25519::Signature> {
+		let pub_key = ed25519::Public::try_from(pubkey.as_ref()).ok()?;
+
+		ext::with(|ext| {
+			ext.keystore()
+				.expect("No `keystore` associated for the current context!")
+				.read()
+				.ed25519_key_pair(id, &pub_key)
+				.map(|k| k.sign(msg))
+		}).expect("`ed25519_sign` cannot be called outside of an Externalities-provided environment.")
+	}
+
+	fn ed25519_verify(sig: &ed25519::Signature, msg: &[u8], pubkey: &ed25519::Public) -> bool {
+		ed25519::Pair::verify(sig, msg, pubkey)
+	}
+
+	fn sr25519_public_keys(id: KeyTypeId) -> Vec<sr25519::Public> {
+		ext::with(|ext| {
+			ext.keystore()
+				.expect("No `keystore` associated for the current context!")
+				.read()
+				.sr25519_public_keys(id)
+		}).expect("`sr25519_public_keys` cannot be called outside of an Externalities-provided environment.")
+	}
+
+	fn sr25519_generate(id: KeyTypeId, seed: Option<&str>) -> sr25519::Public {
+		ext::with(|ext| {
+			ext.keystore()
+				.expect("No `keystore` associated for the current context!")
+				.write()
+				.sr25519_generate_new(id, seed)
+				.expect("`sr25519_generate` failed")
+		}).expect("`sr25519_generate` cannot be called outside of an Externalities-provided environment.")
+	}
+
+	fn sr25519_sign(
+		id: KeyTypeId,
+		pubkey: &sr25519::Public,
+		msg: &[u8],
+	) -> Option<sr25519::Signature> {
+		let pub_key = sr25519::Public::try_from(pubkey.as_ref()).ok()?;
+
+		ext::with(|ext| {
+			ext.keystore()
+				.expect("No `keystore` associated for the current context!")
+				.read()
+				.sr25519_key_pair(id, &pub_key)
+				.map(|k| k.sign(msg))
+		}).expect("`sr25519_sign` cannot be called outside of an Externalities-provided environment.")
+	}
+
+	fn sr25519_verify(sig: &sr25519::Signature, msg: &[u8], pubkey: &sr25519::Public) -> bool {
+		sr25519::Pair::verify(sig, msg, pubkey)
 	}
 
 	fn secp256k1_ecdsa_recover(sig: &[u8; 65], msg: &[u8; 32]) -> Result<[u8; 64], EcdsaVerifyError> {
-		let rs = secp256k1::Signature::parse_slice(&sig[0..64]).map_err(|_| EcdsaVerifyError::BadRS)?;
-		let v = secp256k1::RecoveryId::parse(if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8).map_err(|_| EcdsaVerifyError::BadV)?;
-		let pubkey = secp256k1::recover(&secp256k1::Message::parse(msg), &rs, &v).map_err(|_| EcdsaVerifyError::BadSignature)?;
+		let rs = secp256k1::Signature::parse_slice(&sig[0..64])
+			.map_err(|_| EcdsaVerifyError::BadRS)?;
+		let v = secp256k1::RecoveryId::parse(if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8)
+			.map_err(|_| EcdsaVerifyError::BadV)?;
+		let pubkey = secp256k1::recover(&secp256k1::Message::parse(msg), &rs, &v)
+			.map_err(|_| EcdsaVerifyError::BadSignature)?;
 		let mut res = [0u8; 64];
 		res.copy_from_slice(&pubkey.serialize()[1..65]);
 		Ok(res)
@@ -251,12 +314,129 @@ impl HashingApi for () {
 	}
 }
 
+fn with_offchain<R>(f: impl FnOnce(&mut dyn offchain::Externalities) -> R, msg: &'static str) -> R {
+	ext::with(|ext| ext
+		.offchain()
+		.map(|ext| f(ext))
+		.expect(msg)
+	).expect("offchain-worker functions cannot be called outside of an Externalities-provided environment.")
+}
+
 impl OffchainApi for () {
-	fn submit_extrinsic<T: codec::Encode>(data: &T) {
-		ext::with(|ext| ext
-			.submit_extrinsic(codec::Encode::encode(data))
-			.expect("submit_extrinsic can be called only in offchain worker context")
-		).expect("submit_extrinsic cannot be called outside of an Externalities-provided environment.")
+	fn is_validator() -> bool {
+		with_offchain(|ext| {
+			ext.is_validator()
+		}, "is_validator can be called only in the offchain worker context")
+	}
+
+	fn submit_transaction(data: Vec<u8>) -> Result<(), ()> {
+		with_offchain(|ext| {
+			ext.submit_transaction(data)
+		}, "submit_transaction can be called only in the offchain worker context")
+	}
+
+	fn network_state() -> Result<OpaqueNetworkState, ()> {
+		with_offchain(|ext| {
+			ext.network_state()
+		}, "network_state can be called only in the offchain worker context")
+	}
+
+	fn timestamp() -> offchain::Timestamp {
+		with_offchain(|ext| {
+			ext.timestamp()
+		}, "timestamp can be called only in the offchain worker context")
+	}
+
+	fn sleep_until(deadline: offchain::Timestamp) {
+		with_offchain(|ext| {
+			ext.sleep_until(deadline)
+		}, "sleep_until can be called only in the offchain worker context")
+	}
+
+	fn random_seed() -> [u8; 32] {
+		with_offchain(|ext| {
+			ext.random_seed()
+		}, "random_seed can be called only in the offchain worker context")
+	}
+
+	fn local_storage_set(kind: offchain::StorageKind, key: &[u8], value: &[u8]) {
+		with_offchain(|ext| {
+			ext.local_storage_set(kind, key, value)
+		}, "local_storage_set can be called only in the offchain worker context")
+	}
+
+	fn local_storage_compare_and_set(
+		kind: offchain::StorageKind,
+		key: &[u8],
+		old_value: Option<&[u8]>,
+		new_value: &[u8],
+	) -> bool {
+		with_offchain(|ext| {
+			ext.local_storage_compare_and_set(kind, key, old_value, new_value)
+		}, "local_storage_compare_and_set can be called only in the offchain worker context")
+	}
+
+	fn local_storage_get(kind: offchain::StorageKind, key: &[u8]) -> Option<Vec<u8>> {
+		with_offchain(|ext| {
+			ext.local_storage_get(kind, key)
+		}, "local_storage_get can be called only in the offchain worker context")
+	}
+
+	fn http_request_start(
+		method: &str,
+		uri: &str,
+		meta: &[u8],
+	) -> Result<offchain::HttpRequestId, ()> {
+		with_offchain(|ext| {
+			ext.http_request_start(method, uri, meta)
+		}, "http_request_start can be called only in the offchain worker context")
+	}
+
+	fn http_request_add_header(
+		request_id: offchain::HttpRequestId,
+		name: &str,
+		value: &str,
+	) -> Result<(), ()> {
+		with_offchain(|ext| {
+			ext.http_request_add_header(request_id, name, value)
+		}, "http_request_add_header can be called only in the offchain worker context")
+	}
+
+	fn http_request_write_body(
+		request_id: offchain::HttpRequestId,
+		chunk: &[u8],
+		deadline: Option<offchain::Timestamp>,
+	) -> Result<(), offchain::HttpError> {
+		with_offchain(|ext| {
+			ext.http_request_write_body(request_id, chunk, deadline)
+		}, "http_request_write_body can be called only in the offchain worker context")
+	}
+
+	fn http_response_wait(
+		ids: &[offchain::HttpRequestId],
+		deadline: Option<offchain::Timestamp>,
+	) -> Vec<offchain::HttpRequestStatus> {
+		with_offchain(|ext| {
+			ext.http_response_wait(ids, deadline)
+		}, "http_response_wait can be called only in the offchain worker context")
+	}
+
+	fn http_response_headers(
+		request_id: offchain::HttpRequestId,
+	) -> Vec<(Vec<u8>, Vec<u8>)> {
+		with_offchain(|ext| {
+			ext.http_response_headers(request_id)
+		}, "http_response_headers can be called only in the offchain worker context")
+	}
+
+	fn http_response_read_body(
+		request_id: offchain::HttpRequestId,
+		buffer: &mut [u8],
+		deadline: Option<offchain::Timestamp>,
+	) -> Result<usize, offchain::HttpError> {
+		with_offchain(|ext| {
+			ext.http_response_read_body(request_id, buffer, deadline)
+		}, "http_response_read_body can be called only in the offchain worker context")
 	}
 }
 
@@ -265,7 +445,7 @@ impl Api for () {}
 /// Execute the given closure with global function available whose functionality routes into the
 /// externalities `ext`. Forwards the value that the closure returns.
 // NOTE: need a concrete hasher here due to limitations of the `environmental!` macro, otherwise a type param would have been fine I think.
-pub fn with_externalities<R, F: FnOnce() -> R>(ext: &mut Externalities<Blake2Hasher>, f: F) -> R {
+pub fn with_externalities<R, F: FnOnce() -> R>(ext: &mut dyn Externalities<Blake2Hasher>, f: F) -> R {
 	ext::using(ext, f)
 }
 
@@ -276,32 +456,21 @@ pub type StorageOverlay = HashMap<Vec<u8>, Vec<u8>>;
 pub type ChildrenStorageOverlay = HashMap<Vec<u8>, StorageOverlay>;
 
 /// Execute the given closure with global functions available whose functionality routes into
-/// externalities that draw from and populate `storage`. Forwards the value that the closure returns.
-pub fn with_storage<R, F: FnOnce() -> R>(storage: &mut StorageOverlay, f: F) -> R {
+/// externalities that draw from and populate `storage` and `children_storage`.
+/// Forwards the value that the closure returns.
+pub fn with_storage<R, F: FnOnce() -> R>(
+	storage: &mut (StorageOverlay, ChildrenStorageOverlay),
+	f: F
+) -> R {
 	let mut alt_storage = Default::default();
 	rstd::mem::swap(&mut alt_storage, storage);
-	let mut ext: BasicExternalities = alt_storage.into();
+
+	let mut ext = BasicExternalities::new(alt_storage.0, alt_storage.1);
 	let r = ext::using(&mut ext, f);
-	*storage = ext.into();
+
+	*storage = ext.into_storages();
+
 	r
-}
-
-impl<'a> Printable for &'a [u8] {
-	fn print(self) {
-		println!("Runtime: {}", HexDisplay::from(&self));
-	}
-}
-
-impl<'a> Printable for &'a str {
-	fn print(self) {
-		println!("Runtime: {}", self);
-	}
-}
-
-impl Printable for u64 {
-	fn print(self) {
-		println!("Runtime: {}", self);
-	}
 }
 
 #[cfg(test)]
@@ -321,7 +490,7 @@ mod std_tests {
 			true
 		}));
 
-		t = BasicExternalities::new(map![b"foo".to_vec() => b"bar".to_vec()]);
+		t = BasicExternalities::new(map![b"foo".to_vec() => b"bar".to_vec()], map![]);
 
 		assert!(!with_externalities(&mut t, || {
 			assert_eq!(storage(b"hello"), None);
@@ -334,7 +503,7 @@ mod std_tests {
 	fn read_storage_works() {
 		let mut t = BasicExternalities::new(map![
 			b":test".to_vec() => b"\x0b\0\0\0Hello world".to_vec()
-		]);
+		], map![]);
 
 		with_externalities(&mut t, || {
 			let mut v = [0u8; 4];
@@ -353,7 +522,7 @@ mod std_tests {
 			b":abcd".to_vec() => b"\x0b\0\0\0Hello world".to_vec(),
 			b":abc".to_vec() => b"\x0b\0\0\0Hello world".to_vec(),
 			b":abdd".to_vec() => b"\x0b\0\0\0Hello world".to_vec()
-		]);
+		], map![]);
 
 		with_externalities(&mut t, || {
 			clear_prefix(b":abc");
