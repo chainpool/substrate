@@ -138,7 +138,7 @@ impl<B: ChainApi> Pool<B> {
 							priority,
 							requires,
 							provides,
-							valid_till: block_number.as_().saturating_add(longevity),
+							valid_till: (block_number.as_() as u64).saturating_add(longevity),
 						})
 					},
 					TransactionValidity::Invalid(e) => {
@@ -341,7 +341,7 @@ impl<B: ChainApi> Pool<B> {
 		let now = time::Instant::now();
 		let to_remove = {
 			self.ready()
-				.filter(|tx| self.rotator.ban_if_stale(&now, block_number, &tx))
+				.filter(|tx| self.rotator.ban_if_stale(&now, block_number as u64, &tx))
 				.map(|tx| tx.hash.clone())
 				.collect::<Vec<_>>()
 		};
@@ -349,7 +349,7 @@ impl<B: ChainApi> Pool<B> {
 			let p = self.pool.read();
 			let mut hashes = Vec::new();
 			for tx in p.futures() {
-				if self.rotator.ban_if_stale(&now, block_number, &tx) {
+				if self.rotator.ban_if_stale(&now, block_number as u64, &tx) {
 					hashes.push(tx.hash.clone());
 				}
 			}
