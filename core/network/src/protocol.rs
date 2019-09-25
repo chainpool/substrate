@@ -272,7 +272,7 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 		transaction_pool: Arc<TransactionPool<H, B>>,
 		specialization: S,
 	) -> error::Result<Protocol<B, S, H>> {
-		let info = chain.info()?;
+		let info = chain.info();
 		let sync = ChainSync::new(config.roles, &info);
 		Ok(Protocol {
 			tick_timeout: tokio::timer::Interval::new_interval(TICK_TIMEOUT),
@@ -712,14 +712,12 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 					.context_data
 					.chain
 					.info()
-					.ok()
-					.and_then(|info| info.best_queued_number)
-					.unwrap_or_else(|| Zero::zero());
+					.chain.best_number;
 				let blocks_difference = self_best_block
 					.as_()
 					.checked_sub(status.best_number.as_())
 					.unwrap_or(0);
-				if blocks_difference > LIGHT_MAXIMAL_BLOCKS_DIFFERENCE {
+				if blocks_difference as u64 > LIGHT_MAXIMAL_BLOCKS_DIFFERENCE {
 					debug!(target: "sync", "Peer {} is far behind us and will unable to serve light requests", who);
 					network_out.report_peer(who.clone(), PEER_BEHIND_US_LIGHT_REPUTATION_CHANGE);
 					network_out.disconnect_peer(who);
@@ -859,7 +857,7 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 
 	/// Send Status message
 	fn send_status(&mut self, network_out: &mut dyn NetworkOut<B>, who: PeerId) {
-		if let Ok(info) = self.context_data.chain.info() {
+		let info = self.context_data.chain.info();
 			let status = message::generic::Status {
 				version: CURRENT_VERSION,
 				min_supported_version: MIN_VERSION,
@@ -870,7 +868,7 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 				chain_status: self.specialization.status(),
 			};
 			self.send_message(network_out, who, GenericMessage::Status(status))
-		}
+
 	}
 
 	fn on_block_announce(
@@ -1055,15 +1053,24 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 		who: PeerId,
 		request: message::RemoteReadRequest<B::Hash>,
 	) {
+		let keys_str = || match request.keys.len() {
+			1 => request.keys[0].to_hex::<String>(),
+			_ => format!(
+				"{}..{}",
+				request.keys[0].to_hex::<String>(),
+				request.keys[request.keys.len() - 1].to_hex::<String>(),
+			),
+		};
+
 		trace!(target: "sync", "Remote read request {} from {} ({} at {})",
-			request.id, who, request.key.to_hex::<String>(), request.block);
-		let proof = match self.context_data.chain.read_proof(&request.block, &request.key) {
+			request.id, who, keys_str(), request.block);
+		let proof = match self.context_data.chain.read_proof(&request.block, &request.keys) {
 			Ok(proof) => proof,
 			Err(error) => {
 				trace!(target: "sync", "Remote read request {} from {} ({} at {}) failed with: {}",
 					request.id,
 					who,
-					request.key.to_hex::<String>(),
+					keys_str(),
 					request.block,
 					error
 				);
@@ -1141,12 +1148,14 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 			request.first,
 			request.last
 		);
+		let storage_key = request.storage_key.map(|sk| StorageKey(sk));
 		let key = StorageKey(request.key);
 		let proof = match self.context_data.chain.key_changes_proof(
 			request.first,
 			request.last,
 			request.min,
 			request.max,
+			storage_key.as_ref(),
 			&key
 		) {
 			Ok(proof) => proof,
