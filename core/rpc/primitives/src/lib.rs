@@ -1,4 +1,4 @@
-// Copyright 2018-2019 Parity Technologies (UK) Ltd.
+// Copyright 2019 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -14,22 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::rpc;
-use log::warn;
+//! Substrate RPC primitives and utilities.
 
-pub fn unimplemented() -> rpc::Error {
-	rpc::Error {
-		code: rpc::ErrorCode::ServerError(1),
-		message: "Not implemented yet".into(),
-		data: None,
-	}
-}
+#![warn(missing_docs)]
 
-pub fn internal<E: ::std::fmt::Debug>(e: E) -> rpc::Error {
-	warn!("Unknown error: {:?}", e);
-	rpc::Error {
-		code: rpc::ErrorCode::InternalError,
-		message: "Unknown error occured".into(),
-		data: Some(format!("{:?}", e).into()),
-	}
-}
+pub mod number;

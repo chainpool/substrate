@@ -30,7 +30,7 @@ use serde::Serialize;
 use error_chain::bail;
 use log::debug;
 
-use futures::sync::mpsc;
+use futures::channel::mpsc;
 use parking_lot::{Mutex, RwLock};
 use sr_primitives::{
 	generic::BlockId,

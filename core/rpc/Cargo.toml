@@ -5,30 +5,30 @@ authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2018"
 
 [dependencies]
-error-chain = "0.12"
-jsonrpc-core = "10.0.1"
-jsonrpc-pubsub = "10.0.1"
-jsonrpc-derive = "10.0.2"
-log = "0.4"
-parking_lot = "0.7.1"
-parity-codec = "3.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+api = { package = "substrate-rpc-api", path = "./api" }
 client = { package = "substrate-client", path = "../client" }
-substrate-executor = { path = "../executor" }
-network = { package = "substrate-network", path = "../network" }
+codec = { package = "parity-codec", version = "3.5" }
+futures03 = { package = "futures-preview", version = "0.3.0-alpha.17", features = ["compat"] }
+jsonrpc-pubsub = "13.1.0"
+log = "0.4"
 primitives = { package = "substrate-primitives", path = "../primitives" }
-state_machine = { package = "substrate-state-machine", path = "../state-machine" }
-transaction_pool = { package = "substrate-transaction-pool", path = "../transaction-pool" }
-runtime_primitives = { package = "sr-primitives", path = "../sr-primitives" }
+rpc = { package = "jsonrpc-core", version = "13.0.0" }
 runtime_version = { package = "sr-version", path = "../sr-version" }
-tokio = "0.1.7"
+serde_json = "1.0"
+#session = { package = "substrate-session", path = "../session" }
+sr-primitives = { path = "../sr-primitives" }
+rpc-primitives = { package = "substrate-rpc-primitives", path = "primitives" }
+state_machine = { package = "substrate-state-machine", path = "../state-machine" }
+substrate-executor = { path = "../executor" }
+substrate-keystore = { path = "../keystore" }
+transaction_pool = { package = "substrate-transaction-pool", path = "../transaction-pool" }
+hash-db = { version = "0.15.0", default-features = false }
 
 [dev-dependencies]
 assert_matches = "1.1"
 futures = "0.1.17"
-sr-io = { path = "../sr-io" }
-test_client = { package = "substrate-test-client", path = "../test-client" }
-test_runtime = { package = "substrate-test-runtime", path = "../test-runtime" }
-consensus = { package = "substrate-consensus-common", path = "../consensus/common" }
+network = { package = "substrate-network", path = "../network" }
 rustc-hex = "2.0"
+sr-io = { path = "../sr-io" }
+test-client = { package = "substrate-test-runtime-client", path = "../test-runtime/client" }
+tokio = "0.1.17"

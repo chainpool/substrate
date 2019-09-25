@@ -1,4 +1,4 @@
-// Copyright 2017-2019 Parity Technologies (UK) Ltd.
+// Copyright 2019 Parity Technologies (UK) Ltd.
 // This file is part of Substrate.
 
 // Substrate is free software: you can redistribute it and/or modify
@@ -14,20 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Substrate RPC implementation.
-//!
-//! A core implementation of Substrate RPC interfaces.
+//! Extrinsic helpers for author RPC module.
 
-#![warn(missing_docs)]
+use primitives::Bytes;
+use serde::{Serialize, Deserialize};
 
-mod helpers;
-mod metadata;
-
-pub use api::Subscriptions;
-pub use self::metadata::Metadata;
-pub use rpc::IoHandlerExtension as RpcExtension;
-
-pub mod author;
-pub mod chain;
-pub mod state;
-pub mod system;
+/// RPC Extrinsic or hash
+///
+/// Allows to refer to extrinsic either by its raw representation or its hash.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExtrinsicOrHash<Hash> {
+	/// The hash of the extrinsic.
+	Hash(Hash),
+	/// Raw extrinsic bytes.
+	Extrinsic(Bytes),
+}

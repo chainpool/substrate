@@ -37,6 +37,8 @@ members = [
 	"core/panic-handler",
 	"core/primitives",
 	"core/rpc",
+	"core/rpc/api",
+    "core/rpc/primitives",
 	"core/rpc-servers",
 	"core/serializer",
 	"core/service",

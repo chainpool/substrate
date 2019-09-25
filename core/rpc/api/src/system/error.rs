@@ -14,34 +14,35 @@
 // You should have received a copy of the GNU General Public License
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
-use error_chain::*;
-use client;
-use crate::rpc;
-use crate::errors;
-pub use internal_errors::*;
+//! System RPC module errors.
 
-#[allow(deprecated)]
-mod internal_errors {
-	use super::*;
-	error_chain! {
-		foreign_links {
-			Client(client::error::Error) #[doc = "Client error"];
-		}
-		errors {
-			/// Not implemented yet
-			Unimplemented {
-				description("not yet implemented"),
-				display("Method Not Implemented"),
-			}
-		}
-	}
+use crate::system::helpers::Health;
+use jsonrpc_core as rpc;
+
+/// System RPC Result type.
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// System RPC errors.
+#[derive(Debug, derive_more::Display, derive_more::From)]
+pub enum Error {
+	/// Provided block range couldn't be resolved to a list of blocks.
+	#[display(fmt = "Node is not fully functional: {}", _0)]
+	NotHealthy(Health),
 }
+
+impl std::error::Error for Error {}
+
+/// Base code for all system errors.
+const BASE_ERROR: i64 = 2000;
 
 impl From<Error> for rpc::Error {
 	fn from(e: Error) -> Self {
 		match e {
-			Error(ErrorKind::Unimplemented, _) => errors::unimplemented(),
-			e => errors::internal(e),
+			Error::NotHealthy(ref h) => rpc::Error {
+				code: rpc::ErrorCode::ServerError(BASE_ERROR + 1),
+				message: format!("{}", e),
+				data: serde_json::to_value(h).ok(),
+			},
 		}
 	}
 }

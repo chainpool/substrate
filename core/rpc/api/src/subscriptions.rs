@@ -17,12 +17,11 @@
 use std::collections::HashMap;
 use std::sync::{Arc, atomic::{self, AtomicUsize}};
 
-use log::warn;
+use log::{error, warn};
 use jsonrpc_pubsub::{SubscriptionId, typed::{Sink, Subscriber}};
 use parking_lot::Mutex;
-use crate::rpc::futures::sync::oneshot;
-use crate::rpc::futures::{Future, future};
-use tokio::runtime::TaskExecutor;
+use jsonrpc_core::futures::sync::oneshot;
+use jsonrpc_core::futures::{Future, future};
 
 type Id = u64;
 
@@ -50,16 +49,16 @@ impl IdProvider {
 ///
 /// Takes care of assigning unique subscription ids and
 /// driving the sinks into completion.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Subscriptions {
 	next_id: IdProvider,
 	active_subscriptions: Arc<Mutex<HashMap<Id, oneshot::Sender<()>>>>,
-	executor: TaskExecutor,
+	executor: Arc<dyn future::Executor<Box<dyn Future<Item = (), Error = ()> + Send>> + Send + Sync>,
 }
 
 impl Subscriptions {
 	/// Creates new `Subscriptions` object.
-	pub fn new(executor: TaskExecutor) -> Self {
+	pub fn new(executor: Arc<dyn future::Executor<Box<dyn Future<Item = (), Error = ()> + Send>> + Send + Sync>) -> Self {
 		Subscriptions {
 			next_id: Default::default(),
 			active_subscriptions: Default::default(),
@@ -70,7 +69,7 @@ impl Subscriptions {
 	/// Creates new subscription for given subscriber.
 	///
 	/// Second parameter is a function that converts Subscriber sink into a future.
-	/// This future will be driven to completion bu underlying event loop
+	/// This future will be driven to completion by the underlying event loop
 	/// or will be cancelled in case #cancel is invoked.
 	pub fn add<T, E, G, R, F>(&self, subscriber: Subscriber<T, E>, into_future: G) where
 		G: FnOnce(Sink<T, E>) -> R,
@@ -86,7 +85,9 @@ impl Subscriptions {
 				.then(|_| Ok(()));
 
 			self.active_subscriptions.lock().insert(id, tx);
-			self.executor.spawn(future);
+			if self.executor.execute(Box::new(future)).is_err() {
+				error!("Failed to spawn RPC subscription task");
+			}
 		}
 	}
 

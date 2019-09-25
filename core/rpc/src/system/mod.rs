@@ -16,77 +16,46 @@
 
 //! Substrate system API.
 
-pub mod error;
-
-mod helpers;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
-use jsonrpc_derive::rpc;
-use network;
-use runtime_primitives::traits::{self, Header as HeaderT};
-
+use futures03::{channel::{mpsc, oneshot}, compat::Compat};
+use api::Receiver;
+use sr_primitives::traits::{self, Header as HeaderT};
 use self::error::Result;
+
+pub use api::system::*;
 pub use self::helpers::{Properties, SystemInfo, Health, PeerInfo};
-
-/// Substrate system RPC API
-#[rpc]
-pub trait SystemApi<Hash, Number> {
-	/// Get the node's implementation name. Plain old string.
-	#[rpc(name = "system_name")]
-	fn system_name(&self) -> Result<String>;
-
-	/// Get the node implementation's version. Should be a semver string.
-	#[rpc(name = "system_version")]
-	fn system_version(&self) -> Result<String>;
-
-	/// Get the chain's type. Given as a string identifier.
-	#[rpc(name = "system_chain")]
-	fn system_chain(&self) -> Result<String>;
-
-	/// Get a custom set of properties as a JSON object, defined in the chain spec.
-	#[rpc(name = "system_properties")]
-	fn system_properties(&self) -> Result<Properties>;
-
-	/// Return health status of the node.
-	///
-	/// Node is considered healthy if it is:
-	/// - connected to some peers (unless running in dev mode)
-	/// - not performing a major sync
-	#[rpc(name = "system_health")]
-	fn system_health(&self) -> Result<Health>;
-
-	/// Returns currently connected peers
-	#[rpc(name = "system_peers")]
-	fn system_peers(&self) -> Result<Vec<PeerInfo<Hash, Number>>>;
-
-	/// Returns current state of the network.
-	///
-	/// **Warning**: This API is not stable.
-	// TODO: make this stable and move structs https://github.com/paritytech/substrate/issues/1890
-	#[rpc(name = "system_networkState")]
-	fn system_network_state(&self) -> Result<network::NetworkState>;
-}
+pub use self::gen_client::Client as SystemClient;
 
 /// System API implementation
 pub struct System<B: traits::Block> {
 	info: SystemInfo,
-	sync: Arc<network::SyncProvider<B>>,
-	should_have_peers: bool,
+	send_back: mpsc::UnboundedSender<Request<B>>,
+}
+
+/// Request to be processed.
+pub enum Request<B: traits::Block> {
+	/// Must return the health of the network.
+	Health(oneshot::Sender<Health>),
+	/// Must return information about the peers we are connected to.
+	Peers(oneshot::Sender<Vec<PeerInfo<B::Hash, <B::Header as HeaderT>::Number>>>),
+	/// Must return the state of the network.
+	NetworkState(oneshot::Sender<rpc::Value>),
 }
 
 impl<B: traits::Block> System<B> {
-	/// Creates new `System` given the `SystemInfo`.
+	/// Creates new `System`.
+	///
+	/// The `send_back` will be used to transmit some of the requests. The user is responsible for
+	/// reading from that channel and answering the requests.
 	pub fn new(
 		info: SystemInfo,
-		sync: Arc<network::SyncProvider<B>>,
-		should_have_peers: bool,
+		send_back: mpsc::UnboundedSender<Request<B>>
 	) -> Self {
 		System {
 			info,
-			should_have_peers,
-			sync,
+			send_back,
 		}
 	}
 }
@@ -108,25 +77,21 @@ impl<B: traits::Block> SystemApi<B::Hash, <B::Header as HeaderT>::Number> for Sy
 		Ok(self.info.properties.clone())
 	}
 
-	fn system_health(&self) -> Result<Health> {
-		Ok(Health {
-			peers: self.sync.peers().len(),
-			is_syncing: self.sync.is_major_syncing(),
-			should_have_peers: self.should_have_peers,
-		})
+	fn system_health(&self) -> Receiver<Health> {
+		let (tx, rx) = oneshot::channel();
+		let _ = self.send_back.unbounded_send(Request::Health(tx));
+		Receiver(Compat::new(rx))
 	}
 
-	fn system_peers(&self) -> Result<Vec<PeerInfo<B::Hash, <B::Header as HeaderT>::Number>>> {
-		Ok(self.sync.peers().into_iter().map(|(peer_id, p)| PeerInfo {
-			peer_id: peer_id.to_base58(),
-			roles: format!("{:?}", p.roles),
-			protocol_version: p.protocol_version,
-			best_hash: p.best_hash,
-			best_number: p.best_number,
-		}).collect())
+	fn system_peers(&self) -> Receiver<Vec<PeerInfo<B::Hash, <B::Header as HeaderT>::Number>>> {
+		let (tx, rx) = oneshot::channel();
+		let _ = self.send_back.unbounded_send(Request::Peers(tx));
+		Receiver(Compat::new(rx))
 	}
 
-	fn system_network_state(&self) -> Result<network::NetworkState> {
-		Ok(self.sync.network_state())
+	fn system_network_state(&self) -> Receiver<rpc::Value> {
+		let (tx, rx) = oneshot::channel();
+		let _ = self.send_back.unbounded_send(Request::NetworkState(tx));
+		Receiver(Compat::new(rx))
 	}
 }
