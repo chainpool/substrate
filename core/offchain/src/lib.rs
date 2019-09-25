@@ -19,8 +19,8 @@
 //! The offchain workers is a special function of the runtime that
 //! gets executed after block is imported. During execution
 //! it's able to asynchronously submit extrinsics that will either
-//! be propagated to other nodes (transactions) or will be
-//! added to the next block produced by the node as inherents.
+//! be propagated to other nodes added to the next block
+//! produced by the node as unsigned transactions.
 //!
 //! Offchain workers can be used for computation-heavy tasks
 //! that are not feasible for execution during regular block processing.
@@ -34,99 +34,153 @@
 #![warn(missing_docs)]
 
 use std::{
+	fmt,
 	marker::PhantomData,
 	sync::Arc,
 };
 
 use client::runtime_api::ApiExt;
-use inherents::pool::InherentsPool;
+use futures::future::Future;
 use log::{debug, warn};
-use primitives::ExecutionContext;
-use runtime_primitives::{
-	generic::BlockId,
-	traits::{self, ProvideRuntimeApi},
-};
-use tokio::runtime::TaskExecutor;
+use network::NetworkStateInfo;
+use primitives::{offchain, ExecutionContext};
+use sr_primitives::{generic::BlockId, traits::{self, ProvideRuntimeApi}};
 use transaction_pool::txpool::{Pool, ChainApi};
 
 mod api;
 
+pub mod testing;
+
 pub use offchain_primitives::OffchainWorkerApi;
 
 /// An offchain workers manager.
-#[derive(Debug)]
-pub struct OffchainWorkers<C, Block: traits::Block> {
-	client: Arc<C>,
-	inherents_pool: Arc<InherentsPool<<Block as traits::Block>::Extrinsic>>,
-	executor: TaskExecutor,
+pub struct OffchainWorkers<Client, Storage, Block: traits::Block> {
+	client: Arc<Client>,
+	db: Storage,
 	_block: PhantomData<Block>,
 }
 
-impl<C, Block: traits::Block> OffchainWorkers<C, Block> {
+impl<Client, Storage, Block: traits::Block> OffchainWorkers<Client, Storage, Block> {
 	/// Creates new `OffchainWorkers`.
-	pub fn new(
-		client: Arc<C>,
-		inherents_pool: Arc<InherentsPool<<Block as traits::Block>::Extrinsic>>,
-		executor: TaskExecutor,
-	) -> Self {
+	pub fn new(client: Arc<Client>, db: Storage) -> Self {
 		Self {
 			client,
-			inherents_pool,
-			executor,
+			db,
 			_block: PhantomData,
 		}
 	}
 }
 
-impl<C, Block> OffchainWorkers<C, Block> where
+impl<Client, Storage, Block: traits::Block> fmt::Debug for OffchainWorkers<
+	Client,
+	Storage,
+	Block,
+> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		f.debug_tuple("OffchainWorkers").finish()
+	}
+}
+
+impl<Client, Storage, Block> OffchainWorkers<
+	Client,
+	Storage,
+	Block,
+> where
 	Block: traits::Block,
-	C: ProvideRuntimeApi,
-	C::Api: OffchainWorkerApi<Block>,
+	Client: ProvideRuntimeApi + Send + Sync + 'static,
+	Client::Api: OffchainWorkerApi<Block>,
+	Storage: client::backend::OffchainStorage + 'static,
 {
 	/// Start the offchain workers after given block.
+	#[must_use]
 	pub fn on_block_imported<A>(
 		&self,
 		number: &<Block::Header as traits::Header>::Number,
 		pool: &Arc<Pool<A>>,
-	) where
-		A: ChainApi<Block=Block> + 'static,
-	{
+		network_state: Arc<dyn NetworkStateInfo + Send + Sync>,
+		is_validator: bool,
+	) -> impl Future<Output = ()> where A: ChainApi<Block=Block> + 'static {
 		let runtime = self.client.runtime_api();
 		let at = BlockId::number(*number);
-		let has_api = runtime.has_api::<OffchainWorkerApi<Block>>(&at);
+		let has_api = runtime.has_api::<dyn OffchainWorkerApi<Block>>(&at);
 		debug!("Checking offchain workers at {:?}: {:?}", at, has_api);
 
 		if has_api.unwrap_or(false) {
-			let (api, runner) = api::Api::new(pool.clone(), self.inherents_pool.clone(), at.clone());
-			self.executor.spawn(runner.process());
-
-			debug!("Running offchain workers at {:?}", at);
-			let api = Box::new(api);
-			runtime.offchain_worker_with_context(&at, ExecutionContext::OffchainWorker(api), *number).unwrap();
+			let (api, runner) = api::AsyncApi::new(
+				pool.clone(),
+				self.db.clone(),
+				at.clone(),
+				network_state.clone(),
+				is_validator,
+			);
+			debug!("Spawning offchain workers at {:?}", at);
+			let number = *number;
+			let client = self.client.clone();
+			spawn_worker(move || {
+				let runtime = client.runtime_api();
+				let api = Box::new(api);
+				debug!("Running offchain workers at {:?}", at);
+				let run = runtime.offchain_worker_with_context(
+					&at,
+					ExecutionContext::OffchainCall(Some((api, offchain::Capabilities::all()))),
+					number,
+				);
+				if let Err(e) =	run {
+					log::error!("Error running offchain workers at {:?}: {:?}", at, e);
+				}
+			});
+			futures::future::Either::Left(runner.process())
+		} else {
+			futures::future::Either::Right(futures::future::ready(()))
 		}
 	}
+}
+
+/// Spawns a new offchain worker.
+///
+/// We spawn offchain workers for each block in a separate thread,
+/// since they can run for a significant amount of time
+/// in a blocking fashion and we don't want to block the runtime.
+///
+/// Note that we should avoid that if we switch to future-based runtime in the future,
+/// alternatively:
+/// TODO [ToDr] (#1458) we can consider using a thread pool instead.
+fn spawn_worker(f: impl FnOnce() -> () + Send + 'static) {
+	std::thread::spawn(f);
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use futures::Future;
+	use network::{Multiaddr, PeerId};
+
+	struct MockNetworkStateInfo();
+
+	impl NetworkStateInfo for MockNetworkStateInfo {
+		fn external_addresses(&self) -> Vec<Multiaddr> {
+			Vec::new()
+		}
+
+		fn peer_id(&self) -> PeerId {
+			PeerId::random()
+		}
+	}
 
 	#[test]
 	fn should_call_into_runtime_and_produce_extrinsic() {
 		// given
 		let _ = env_logger::try_init();
-		let runtime = tokio::runtime::Runtime::new().unwrap();
 		let client = Arc::new(test_client::new());
-		let pool = Arc::new(Pool::new(Default::default(), ::transaction_pool::ChainApi::new(client.clone())));
-		let inherents = Arc::new(InherentsPool::default());
+		let pool = Arc::new(Pool::new(Default::default(), transaction_pool::ChainApi::new(client.clone())));
+		let db = client_db::offchain::LocalStorage::new_test();
+		let network_state = Arc::new(MockNetworkStateInfo());
 
 		// when
-		let offchain = OffchainWorkers::new(client, inherents.clone(), runtime.executor());
-		offchain.on_block_imported(&0u64, &pool);
+		let offchain = OffchainWorkers::new(client, db);
+		futures::executor::block_on(offchain.on_block_imported(&0u64, &pool, network_state, false));
 
 		// then
-		runtime.shutdown_on_idle().wait().unwrap();
-		assert_eq!(inherents.drain().len(), 1);
+		assert_eq!(pool.status().ready, 1);
+		assert_eq!(pool.ready().next().unwrap().is_propagateable(), false);
 	}
 }

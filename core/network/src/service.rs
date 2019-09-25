@@ -43,6 +43,7 @@ use tokio::runtime::Builder as RuntimeBuilder;
 const STATUS_INTERVAL: Duration = Duration::from_millis(5000);
 
 pub use network_libp2p::PeerId;
+pub use network_libp2p::Multiaddr;
 
 /// Type that represents fetch completion future.
 pub type FetchFuture = oneshot::Receiver<Vec<u8>>;
@@ -362,6 +363,27 @@ impl<B: BlockT + 'static, S: NetworkSpecialization<B>> ::consensus::SyncOracle f
 
 	fn is_offline(&self) -> bool {
 		self.is_offline.load(Ordering::Relaxed)
+	}
+}
+
+/// Trait for providing information about the local network state
+pub trait NetworkStateInfo {
+	/// Returns the local external addresses.
+	fn external_addresses(&self) -> Vec<Multiaddr>;
+
+	/// Returns the local Peer ID.
+	fn peer_id(&self) -> PeerId;
+}
+
+impl<B: BlockT + 'static, S: NetworkSpecialization<B>> NetworkStateInfo for Service<B, S> {
+	/// Returns the local external addresses.
+	fn external_addresses(&self) -> Vec<Multiaddr> {
+		panic!("not impl yet for external_addresses")
+	}
+
+	/// Returns the local Peer ID.
+	fn peer_id(&self) -> PeerId {
+		panic!("not impl yet for peer_id")
 	}
 }
 
