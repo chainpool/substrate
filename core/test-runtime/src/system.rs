@@ -295,9 +295,9 @@ fn info_expect_equal_hash(given: &Hash, expected: &Hash) {
 #[cfg(not(feature = "std"))]
 fn info_expect_equal_hash(given: &Hash, expected: &Hash) {
 	if given != expected {
-		::runtime_io::print("Hash not equal");
-		::runtime_io::print(given.as_bytes());
-		::runtime_io::print(expected.as_bytes());
+		::runtime_io::print_utf8("Hash not equal".as_bytes());
+		::runtime_io::print_utf8(given.as_bytes());
+		::runtime_io::print_utf8(expected.as_bytes());
 	}
 }
 

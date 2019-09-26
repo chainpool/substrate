@@ -304,7 +304,7 @@ impl<T> Instance<T> {
 		match result {
 			sandbox_primitives::ERR_OK => {
 				let return_val = sandbox_primitives::ReturnValue::decode(&mut &return_val[..])
-					.map_err(|_| Error::Execution)?;
+					.ok_or(Error::Execution)?;
 				Ok(return_val)
 			}
 			sandbox_primitives::ERR_EXECUTION => Err(Error::Execution),

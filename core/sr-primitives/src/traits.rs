@@ -554,9 +554,9 @@ impl CheckEqual for substrate_primitives::H256 {
 	#[cfg(not(feature = "std"))]
 	fn check_equal(&self, other: &Self) {
 		if self != other {
-			runtime_io::print("Hash not equal");
-			runtime_io::print(self.as_bytes());
-			runtime_io::print(other.as_bytes());
+			runtime_io::print_utf8("Hash not equal".as_bytes());
+			runtime_io::print_utf8(self.as_bytes());
+			runtime_io::print_utf8(other.as_bytes());
 		}
 	}
 }
@@ -572,9 +572,9 @@ impl<I> CheckEqual for I where I: DigestItem {
 	#[cfg(not(feature = "std"))]
 	fn check_equal(&self, other: &Self) {
 		if self != other {
-			runtime_io::print("DigestItem not equal");
-			runtime_io::print(&Encode::encode(self)[..]);
-			runtime_io::print(&Encode::encode(other)[..]);
+			runtime_io::print_utf8("DigestItem not equal".as_bytes());
+			runtime_io::print_utf8(&Encode::encode(self)[..]);
+			runtime_io::print_utf8(&Encode::encode(other)[..]);
 		}
 	}
 }

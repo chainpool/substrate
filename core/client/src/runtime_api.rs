@@ -36,6 +36,7 @@ pub use primitives::{offchain, ExecutionContext};
 pub use runtime_version::{ApiId, RuntimeVersion, ApisVec, create_apis_vec};
 #[doc(hidden)]
 pub use rstd::{slice, mem};
+use rstd::prelude::Vec;
 #[cfg(feature = "std")]
 use rstd::result;
 #[doc(hidden)]

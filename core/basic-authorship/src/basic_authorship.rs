@@ -94,7 +94,7 @@ impl<B, E, Block, RA> AuthoringApi for SubstrateClient<B, E, Block, RA> where
 		inherent_data: InherentData,
 		mut build_ctx: F,
 	) -> Result<Self::Block, error::Error> {
-		let mut block_builder = self.new_block_at(at)?;
+		let mut block_builder = self.new_block_at(at, Default::default())?;
 
 		let runtime_api = self.runtime_api();
 		// We don't check the API versions any further here since the dispatch compatibility

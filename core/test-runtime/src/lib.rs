@@ -166,13 +166,13 @@ pub type Header = runtime_primitives::generic::Header<BlockNumber, BlakeTwo256, 
 
 /// Run whatever tests we have.
 pub fn run_tests(mut input: &[u8]) -> Vec<u8> {
-	use runtime_io::print;
+	use runtime_io::print_utf8;
 
-	print("run_tests...");
+	print_utf8("run_tests...".as_bytes());
 	let block = Block::decode(&mut input).unwrap();
-	print("deserialized block.");
+	print_utf8("deserialized block.".as_bytes());
 	let stxs = block.extrinsics.iter().map(Encode::encode).collect::<Vec<_>>();
-	print("reserialized transactions.");
+	print_utf8("reserialized transactions.".as_bytes());
 	[stxs.len() as u8].encode()
 }
 

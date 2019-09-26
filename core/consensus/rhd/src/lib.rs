@@ -920,7 +920,7 @@ impl<'a, B, E, Block> AuthoringApi for SubstrateClient<B, E, Block> where
 	) -> Result<Self::Block, Error> {
 		let runtime_version = self.runtime_version_at(at)?;
 
-		let mut block_builder = self.new_block_at(at)?;
+		let mut block_builder = self.new_block_at(at, Default::default())?;
 		if runtime_version.has_api(*b"blkbuild", 1) {
 			for inherent in self.inherent_extrinsics(at, &inherent_data)? {
 				block_builder.push(inherent)?;

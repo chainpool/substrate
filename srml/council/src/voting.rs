@@ -19,7 +19,7 @@
 use rstd::prelude::*;
 use rstd::borrow::Borrow;
 use primitives::traits::{Hash, As, Zero};
-use runtime_io::print;
+use runtime_io::print_utf8;
 use srml_support::dispatch::Result;
 use srml_support::{StorageValue, StorageMap, IsSubType, decl_module, decl_storage, decl_event, ensure};
 use {system, democracy};
@@ -104,8 +104,8 @@ decl_module! {
 
 		fn on_finalize(n: T::BlockNumber) {
 			if let Err(e) = Self::end_block(n) {
-				print("Guru meditation");
-				print(e);
+				print_utf8("Guru meditation".as_bytes());
+				print_utf8(e.as_bytes());
 			}
 		}
 	}

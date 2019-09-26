@@ -74,34 +74,34 @@ pub type Executor = client::LocalCallExecutor<
 /// Test client light database backend.
 pub type LightBackend = client::light::backend::Backend<
 	client_db::light::LightStorage<runtime::Block>,
-	LightFetcher,
+//	LightFetcher,
 	Blake2Hasher,
 >;
 
-/// Test client light fetcher.
-pub struct LightFetcher;
-
-/// Test client light executor.
-#[cfg(feature = "include-wasm-blob")]
-pub type LightExecutor = client::light::call_executor::RemoteOrLocalCallExecutor<
-	runtime::Block,
-	LightBackend,
-	client::light::call_executor::RemoteCallExecutor<
-		client::light::blockchain::Blockchain<
-			client_db::light::LightStorage<runtime::Block>,
-			LightFetcher
-		>,
-		LightFetcher
-	>,
-	client::LocalCallExecutor<
-		client::light::backend::Backend<
-			client_db::light::LightStorage<runtime::Block>,
-			LightFetcher,
-			Blake2Hasher
-		>,
-		executor::NativeExecutor<LocalExecutor>
-	>
->;
+///// Test client light fetcher.
+//pub struct LightFetcher;
+//
+///// Test client light executor.
+//#[cfg(feature = "include-wasm-blob")]
+//pub type LightExecutor = client::light::call_executor::RemoteOrLocalCallExecutor<
+//	runtime::Block,
+//	LightBackend,
+//	client::light::call_executor::RemoteCallExecutor<
+//		client::light::blockchain::Blockchain<
+//			client_db::light::LightStorage<runtime::Block>,
+//			LightFetcher
+//		>,
+//		LightFetcher
+//	>,
+//	client::LocalCallExecutor<
+//		client::light::backend::Backend<
+//			client_db::light::LightStorage<runtime::Block>,
+//			LightFetcher,
+//			Blake2Hasher
+//		>,
+//		executor::NativeExecutor<LocalExecutor>
+//	>
+//>;
 
 /// A builder for creating a test client instance.
 pub struct TestClientBuilder {
@@ -207,19 +207,19 @@ pub fn new() -> client::Client<Backend, Executor, runtime::Block, runtime::Runti
 	new_with_backend(Arc::new(Backend::new_test(::std::u32::MAX, ::std::u64::MAX)), false)
 }
 
-/// Creates new light client instance used for tests.
-#[cfg(feature = "include-wasm-blob")]
-pub fn new_light() -> client::Client<LightBackend, LightExecutor, runtime::Block, runtime::RuntimeApi> {
-	let storage = client_db::light::LightStorage::new_test();
-	let blockchain = Arc::new(client::light::blockchain::Blockchain::new(storage));
-	let backend = Arc::new(LightBackend::new(blockchain.clone()));
-	let executor = NativeExecutor::new(None);
-	let fetcher = Arc::new(LightFetcher);
-	let remote_call_executor = client::light::call_executor::RemoteCallExecutor::new(blockchain.clone(), fetcher);
-	let local_call_executor = client::LocalCallExecutor::new(backend.clone(), executor);
-	let call_executor = LightExecutor::new(backend.clone(), remote_call_executor, local_call_executor);
-	client::Client::new(backend, call_executor, genesis_storage(false, Default::default()), Default::default()).unwrap()
-}
+///// Creates new light client instance used for tests.
+//#[cfg(feature = "include-wasm-blob")]
+//pub fn new_light() -> client::Client<LightBackend, LightExecutor, runtime::Block, runtime::RuntimeApi> {
+//	let storage = client_db::light::LightStorage::new_test();
+//	let blockchain = Arc::new(client::light::blockchain::Blockchain::new(storage));
+//	let backend = Arc::new(LightBackend::new(blockchain.clone()));
+//	let executor = NativeExecutor::new(None);
+//	let fetcher = Arc::new(LightFetcher);
+//	let remote_call_executor = client::light::call_executor::RemoteCallExecutor::new(blockchain.clone(), fetcher);
+//	let local_call_executor = client::LocalCallExecutor::new(backend.clone(), executor);
+//	let call_executor = LightExecutor::new(backend.clone(), remote_call_executor, local_call_executor);
+//	client::Client::new(backend, call_executor, genesis_storage(false, Default::default()), Default::default()).unwrap()
+//}
 
 /// Creates new client instance used for tests with the given api execution strategy.
 #[cfg(feature = "include-wasm-blob")]
