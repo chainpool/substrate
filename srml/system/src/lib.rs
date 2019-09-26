@@ -125,8 +125,7 @@ pub fn extrinsics_root<H: Hash, E: parity_codec::Encode>(extrinsics: &[E]) -> H:
 
 /// Compute the trie root of a list of extrinsics.
 pub fn extrinsics_data_root<H: Hash>(xts: Vec<Vec<u8>>) -> H::Output {
-	let xts = xts.iter().map(Vec::as_slice).collect::<Vec<_>>();
-	H::enumerated_trie_root(&xts)
+	H::ordered_trie_root(xts)
 }
 
 pub trait Trait: 'static + Eq + Clone {
@@ -493,7 +492,7 @@ impl<T: Trait> Module<T> {
 		let mut digest = <Digest<T>>::take();
 		let extrinsics_root = <ExtrinsicsRoot<T>>::take();
 		let storage_root = T::Hashing::storage_root();
-		let storage_changes_root = T::Hashing::storage_changes_root(parent_hash, number.as_() - 1);
+		let storage_changes_root = T::Hashing::storage_changes_root(parent_hash);
 
 		// we can't compute changes trie root earlier && put it to the Digest
 		// because it will include all currently existing temporaries.
@@ -524,11 +523,11 @@ impl<T: Trait> Module<T> {
 	/// Get the basic externalities for this module, useful for tests.
 	#[cfg(any(feature = "std", test))]
 	pub fn externalities() -> TestExternalities<Blake2Hasher> {
-		TestExternalities::new(map![
+		TestExternalities::new((map![
 			twox_128(&<BlockHash<T>>::key_for(T::BlockNumber::zero())).to_vec() => [69u8; 32].encode(),
 			twox_128(<Number<T>>::key()).to_vec() => T::BlockNumber::one().encode(),
 			twox_128(<ParentHash<T>>::key()).to_vec() => [69u8; 32].encode()
-		])
+		], map![]))
 	}
 
 	/// Set the block number to something in particular. Can be used as an alternative to

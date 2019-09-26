@@ -85,12 +85,9 @@ pub trait EnsureOrigin<OuterOrigin> {
 	/// A return type.
 	type Success;
 	/// Perform the origin check.
-	fn ensure_origin(o: OuterOrigin) -> result::Result<Self::Success, InvalidOrigin> {
-		Self::try_origin(o).map_err(|_| InvalidOrigin)
-	}
-	/// Perform the origin check.
-	fn try_origin(o: OuterOrigin) -> result::Result<Self::Success, OuterOrigin>;
+	fn ensure_origin(o: OuterOrigin) -> result::Result<Self::Success, &'static str>;
 }
+
 
 /// Means of changing one type into another in a manner dependent on the source type.
 pub trait Lookup {
@@ -202,7 +199,7 @@ impl_numerics!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize);
 
 /// A meta trait for arithmetic.
 pub trait SimpleArithmetic:
-	Zero + One + IntegerSquareRoot + As<u8> + As<u16> + As<u32> + As<u64> + As<u128> + As<usize> +
+	Zero + One + IntegerSquareRoot + As<u8> + As<u16> + As<u32> + As<u128> + As<usize> + As<u64> +
 	From<u8> + From<u16> + From<u32> + TryInto<u8> + TryInto<u16> + TryInto<u32> +
 	TryFrom<u64> + TryInto<u64> + TryFrom<u128> + TryInto<u128> + TryFrom<usize> + TryInto<usize> +
 	UniqueSaturatedInto<u8> + UniqueSaturatedInto<u16> + UniqueSaturatedInto<u32> +
@@ -218,7 +215,7 @@ pub trait SimpleArithmetic:
 	HasCompact + Sized
 {}
 impl<T:
-	Zero + One + IntegerSquareRoot + As<u8> + As<u16> + As<u32> + As<u64> + As<u128> + As<usize> +
+	Zero + One + IntegerSquareRoot + As<u8> + As<u16> + As<u32> + As<u128> + As<usize> + As<u64> +
 	From<u8> + From<u16> + From<u32> + TryInto<u8> + TryInto<u16> + TryInto<u32> +
 	TryFrom<u64> + TryInto<u64> + TryFrom<u128> + TryInto<u128> + TryFrom<usize> + TryInto<usize> +
 	UniqueSaturatedInto<u8> + UniqueSaturatedInto<u16> + UniqueSaturatedInto<u32> +

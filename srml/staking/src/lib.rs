@@ -510,8 +510,8 @@ decl_storage! {
 	}
 	add_extra_genesis {
 		config(stakers): Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
-		build(|storage: &mut primitives::StorageOverlay, _: &mut primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
-			with_storage(storage, || {
+		build(|storage: &mut primitives::StorageOverlay, child: &mut primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
+			with_storage(storage, child, || {
 				for &(ref stash, ref controller, balance, ref status) in &config.stakers {
 					assert!(T::Currency::free_balance(&stash) >= balance);
 					let _ = <Module<T>>::bond(
