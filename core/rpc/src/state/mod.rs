@@ -23,7 +23,7 @@ mod state_full;
 mod tests;
 
 use std::sync::Arc;
-use futures03::{future, StreamExt as _, TryStreamExt as _};
+//use futures03::{future, StreamExt as _, TryStreamExt as _};
 use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId};
 use log::warn;
 use rpc::{
@@ -190,12 +190,11 @@ pub trait StateBackend<B, E, Block: BlockT, RA>: Send + Sync + 'static
 						.map_err(Into::into);
 					if previous_version != version {
 						previous_version = version.clone();
-						future::ready(Some(Ok::<_, ()>(version)))
+						Some(version)
 					} else {
-						future::ready(None)
+						None
 					}
-				})
-				.compat();
+				});
 
 			sink
 				.sink_map_err(|e| warn!("Error sending notifications: {:?}", e))
@@ -237,6 +236,37 @@ pub trait StateBackend<B, E, Block: BlockT, RA>: Send + Sync + 'static
 		};
 
 		// initial values
+//		let initial = stream::iter_result(keys
+//			.map(|keys| {
+//				let block = self.client().info().chain.best_hash;
+//				let changes = keys
+//					.into_iter()
+//					.map(|key| self.storage(Some(block.clone()).into(), key.clone())
+//						.map(|val| (key.clone(), val))
+//						.wait()
+//						.unwrap_or_else(|_| (key, None))
+//					)
+//					.collect();
+//				vec![Ok(Ok(StorageChangeSet { block, changes }))]
+//			}).unwrap_or_default());
+//
+//		self.subscriptions().add(subscriber, |sink| {
+//			let stream = stream
+//				.map(|(block, changes)| Ok::<_, ()>(Ok(StorageChangeSet {
+//					block,
+//					changes: changes.iter()
+//						.filter_map(|(o_sk, k, v)| if o_sk.is_none() {
+//							Some((k.clone(),v.cloned()))
+//						} else { None }).collect(),
+//				})));
+//
+//			sink
+//				.sink_map_err(|e| warn!("Error sending notifications: {:?}", e))
+//				.send_all(initial.chain(stream))
+//				// we ignore the resulting Stream (if the first stream is over we are unsubscribed)
+//				.map(|_| ())
+//		})
+
 		let initial = stream::iter_result(keys
 			.map(|keys| {
 				let block = self.client().info().chain.best_hash;
@@ -253,14 +283,14 @@ pub trait StateBackend<B, E, Block: BlockT, RA>: Send + Sync + 'static
 
 		self.subscriptions().add(subscriber, |sink| {
 			let stream = stream
-				.map(|(block, changes)| Ok::<_, ()>(Ok(StorageChangeSet {
+				.map_err(|e| warn!("Error creating storage notification stream: {:?}", e))
+				.map(|(block, changes)| Ok(StorageChangeSet {
 					block,
 					changes: changes.iter()
 						.filter_map(|(o_sk, k, v)| if o_sk.is_none() {
 							Some((k.clone(),v.cloned()))
 						} else { None }).collect(),
-				})))
-				.compat();
+				}));
 
 			sink
 				.sink_map_err(|e| warn!("Error sending notifications: {:?}", e))

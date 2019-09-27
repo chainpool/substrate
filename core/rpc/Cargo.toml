@@ -8,7 +8,7 @@ edition = "2018"
 api = { package = "substrate-rpc-api", path = "./api" }
 client = { package = "substrate-client", path = "../client" }
 codec = { package = "parity-codec", version = "3.5" }
-futures03 = { package = "futures-preview", version = "0.3.0-alpha.17", features = ["compat"] }
+futures = "0.1.17"
 jsonrpc-pubsub = "13.1.0"
 log = "0.4"
 primitives = { package = "substrate-primitives", path = "../primitives" }
@@ -27,7 +27,6 @@ network = { package = "substrate-network", path = "../network" }
 
 [dev-dependencies]
 assert_matches = "1.1"
-futures = "0.1.17"
 rustc-hex = "2.0"
 sr-io = { path = "../sr-io" }
 test-client = { package = "substrate-test-runtime-client", path = "../test-runtime/client" }

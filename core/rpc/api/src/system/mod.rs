@@ -19,7 +19,7 @@
 pub mod error;
 pub mod helpers;
 
-use crate::helpers::Receiver;
+//use crate::helpers::Receiver;
 use jsonrpc_derive::rpc;
 
 use self::error::Result;

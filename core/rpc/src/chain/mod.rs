@@ -23,7 +23,7 @@ mod chain_light;
 mod tests;
 
 use std::sync::Arc;
-use futures03::{future, StreamExt as _, TryStreamExt as _};
+//use futures03::{future, StreamExt as _, TryStreamExt as _};
 use log::warn;
 use rpc::{
 	Result as RpcResult,
@@ -107,9 +107,8 @@ trait ChainBackend<B, E, Block: BlockT, RA>: Send + Sync + 'static
 			subscriber,
 			|| self.client().info().chain.best_hash,
 			|| self.client().import_notification_stream()
-				.filter(|notification| future::ready(notification.is_new_best))
-				.map(|notification| Ok::<_, ()>(notification.header))
-				.compat(),
+				.filter(|notification| notification.is_new_best)
+				.map(|notification| notification.header),
 		)
 	}
 
@@ -134,8 +133,7 @@ trait ChainBackend<B, E, Block: BlockT, RA>: Send + Sync + 'static
 			subscriber,
 			|| self.client().info().chain.finalized_hash,
 			|| self.client().finality_notification_stream()
-				.map(|notification| Ok::<_, ()>(notification.header))
-				.compat(),
+				.map(|notification| notification.header),
 		)
 	}
 

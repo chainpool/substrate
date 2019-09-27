@@ -21,12 +21,12 @@
 #![warn(missing_docs)]
 
 mod errors;
-mod helpers;
+//mod helpers;
 mod subscriptions;
 
 pub use jsonrpc_core::IoHandlerExtension as RpcExtension;
 pub use subscriptions::Subscriptions;
-pub use helpers::Receiver;
+//pub use helpers::Receiver;
 
 pub mod author;
 pub mod chain;

@@ -15,7 +15,6 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 use jsonrpc_core::futures::prelude::*;
-use futures03::{channel::oneshot, compat::Compat};
 
 /// Wraps around `oneshot::Receiver` and adjusts the error type to produce an internal error if the
 /// sender gets dropped.

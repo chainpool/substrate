@@ -22,7 +22,6 @@ use std::time::{Instant, Duration};
 use log::{trace, info};
 use futures::{Async, Future, Poll};
 use futures::sync::oneshot::{channel, Receiver, Sender as OneShotSender};
-use futures03::compat::{Compat01As03, Future01CompatExt as _};
 use linked_hash_map::{Entry, LinkedHashMap};
 use parking_lot::Mutex;
 use client::error::Error as ClientError;
@@ -441,67 +440,67 @@ impl<B> OnDemandService<B> for OnDemand<B> where
 	}
 }
 
-impl<B> Fetcher<B> for OnDemand<B> where
-	B: BlockT,
-	B::Header: HeaderT,
-{
-	type RemoteHeaderResult = Compat01As03<RemoteResponse<B::Header>>;
-	type RemoteReadResult = Compat01As03<RemoteResponse<HashMap<Vec<u8>, Option<Vec<u8>>>>>;
-	type RemoteCallResult = Compat01As03<RemoteResponse<Vec<u8>>>;
-	type RemoteChangesResult = Compat01As03<RemoteResponse<Vec<(NumberFor<B>, u32)>>>;
-	type RemoteBodyResult = Compat01As03<RemoteResponse<Vec<B::Extrinsic>>>;
-
-	fn remote_header(&self, request: RemoteHeaderRequest<B::Header>) -> Self::RemoteHeaderResult {
+//impl<B> Fetcher<B> for OnDemand<B> where
+//	B: BlockT,
+//	B::Header: HeaderT,
+//{
+//	type RemoteHeaderResult = (); //Compat01As03<RemoteResponse<B::Header>>;
+//	type RemoteReadResult = (); //Compat01As03<RemoteResponse<HashMap<Vec<u8>, Option<Vec<u8>>>>>;
+//	type RemoteCallResult = (); //Compat01As03<RemoteResponse<Vec<u8>>>;
+//	type RemoteChangesResult = (); // Compat01As03<RemoteResponse<Vec<(NumberFor<B>, u32)>>>;
+//	type RemoteBodyResult = (); //Compat01As03<RemoteResponse<Vec<B::Extrinsic>>>;
+//
+//	fn remote_header(&self, request: RemoteHeaderRequest<B::Header>) -> Self::RemoteHeaderResult {
 //		let (sender, receiver) = channel();
 //		self.schedule_request(request.retry_count.clone(), RequestData::RemoteHeader(request, sender),
 //			RemoteResponse { receiver })
-		unimplemented!("not (yet) used in light client")
-	}
-
-	fn remote_read(&self, request: RemoteReadRequest<B::Header>) -> Self::RemoteReadResult {
+//		unimplemented!("not (yet) used in light client")
+//	}
+//
+//	fn remote_read(&self, request: RemoteReadRequest<B::Header>) -> Self::RemoteReadResult {
 //		let (sender, receiver) = channel();
 //		self.schedule_request(
 //			request.retry_count.clone(),
 //			RequestData::RemoteRead(request, sender),
 //			RemoteResponse { receiver }
 //		)
-		unimplemented!("not (yet) used in light client")
-	}
-
-	fn remote_read_child(
-		&self,
-		request: RemoteReadChildRequest<B::Header>
-	) -> Self::RemoteReadResult {
+//		unimplemented!("not (yet) used in light client")
+//	}
+//
+//	fn remote_read_child(
+//		&self,
+//		request: RemoteReadChildRequest<B::Header>
+//	) -> Self::RemoteReadResult {
 //		let (sender, receiver) = channel();
 //		self.schedule_request(
 //			request.retry_count.clone(),
 //			RequestData::RemoteReadChild(request, sender),
 //			RemoteResponse { receiver }
 //		)
-		unimplemented!("not (yet) used in light client")
-	}
-
-	fn remote_call(&self, request: RemoteCallRequest<B::Header>) -> Self::RemoteCallResult {
+//		unimplemented!("not (yet) used in light client")
+//	}
+//
+//	fn remote_call(&self, request: RemoteCallRequest<B::Header>) -> Self::RemoteCallResult {
 //		let (sender, receiver) = channel();
 //		self.schedule_request(request.retry_count.clone(), RequestData::RemoteCall(request, sender),
 //			RemoteResponse { receiver })
-		unimplemented!("not (yet) used in light client")
-	}
-
-	fn remote_changes(&self, request: RemoteChangesRequest<B::Header>) -> Self::RemoteChangesResult {
+//		unimplemented!("not (yet) used in light client")
+//	}
+//
+//	fn remote_changes(&self, request: RemoteChangesRequest<B::Header>) -> Self::RemoteChangesResult {
 //		let (sender, receiver) = channel();
 //		self.schedule_request(request.retry_count.clone(), RequestData::RemoteChanges(request, sender),
 //			RemoteResponse { receiver })
-		unimplemented!("not (yet) used in light client")
-	}
-
-	fn remote_body(&self, request: RemoteBodyRequest<B::Header>) -> Self::RemoteBodyResult {
+//		unimplemented!("not (yet) used in light client")
+//	}
+//
+//	fn remote_body(&self, request: RemoteBodyRequest<B::Header>) -> Self::RemoteBodyResult {
 //		let (sender, receiver) = channel();
 //		self.schedule_request(request.retry_count.clone(), RequestData::RemoteBody(request, sender),
 //			RemoteResponse { receiver })
-		unimplemented!("not (yet) used in light client")
-	}
-}
+//		unimplemented!("not (yet) used in light client")
+//	}
+//}
 
 impl<B> OnDemandCore<B> where
 	B: BlockT,

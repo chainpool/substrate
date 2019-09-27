@@ -17,7 +17,7 @@
 //! Blockchain API backend for light nodes.
 
 use std::sync::Arc;
-use futures03::{future::ready, FutureExt, TryFutureExt};
+//use futures03::{future::ready, FutureExt, TryFutureExt};
 use rpc::futures::future::{result, Future, Either};
 
 use api::Subscriptions;
@@ -84,40 +84,42 @@ impl<B, E, Block, RA, F> ChainBackend<B, E, Block, RA> for LightChain<B, E, Bloc
 	fn header(&self, hash: Option<Block::Hash>) -> FutureResult<Option<Block::Header>> {
 		let hash = self.unwrap_or_best(hash);
 
-		let fetcher = self.fetcher.clone();
-		let maybe_header = client::light::blockchain::future_header(
-			&*self.remote_blockchain,
-			&*fetcher,
-			BlockId::Hash(hash),
-		);
-
-		Box::new(maybe_header.then(move |result|
-			ready(result.map_err(client_err)),
-		).boxed().compat())
+//		let fetcher = self.fetcher.clone();
+//		let maybe_header = client::light::blockchain::future_header(
+//			&*self.remote_blockchain,
+//			&*fetcher,
+//			BlockId::Hash(hash),
+//		);
+//
+//		Box::new(maybe_header.then(move |result|
+//			ready(result.map_err(client_err)),
+//		).boxed().compat())
+		unimplemented!("not impl for header(light client rpc)")
 	}
 
 	fn block(&self, hash: Option<Block::Hash>)
 		-> FutureResult<Option<SignedBlock<Block>>>
 	{
-		let fetcher = self.fetcher.clone();
-		let block = self.header(hash)
-			.and_then(move |header| match header {
-				Some(header) => Either::A(fetcher
-					.remote_body(RemoteBodyRequest {
-						header: header.clone(),
-						retry_count: Default::default(),
-					})
-					.boxed()
-					.compat()
-					.map(move |body| Some(SignedBlock {
-						block: Block::new(header, body),
-						justification: None,
-					}))
-					.map_err(client_err)
-				),
-				None => Either::B(result(Ok(None))),
-			});
-
-		Box::new(block)
+//		let fetcher = self.fetcher.clone();
+//		let block = self.header(hash)
+//			.and_then(move |header| match header {
+//				Some(header) => Either::A(fetcher
+//					.remote_body(RemoteBodyRequest {
+//						header: header.clone(),
+//						retry_count: Default::default(),
+//					})
+//					.boxed()
+//					.compat()
+//					.map(move |body| Some(SignedBlock {
+//						block: Block::new(header, body),
+//						justification: None,
+//					}))
+//					.map_err(client_err)
+//				),
+//				None => Either::B(result(Ok(None))),
+//			});
+//
+//		Box::new(block)
+		unimplemented!("not impl for block(light client rpc)")
 	}
 }

@@ -22,7 +22,7 @@ use std::{
 };
 
 use fnv::{FnvHashSet, FnvHashMap};
-use futures03::channel::mpsc;
+use futures::sync::mpsc;
 use primitives::storage::{StorageKey, StorageData};
 use sr_primitives::traits::Block as BlockT;
 
