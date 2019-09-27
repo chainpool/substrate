@@ -16,7 +16,7 @@
 
 //! Service configuration.
 
-use std::net::SocketAddr;
+use std::{path::PathBuf, net::SocketAddr};
 use transaction_pool;
 use crate::chain_spec::ChainSpec;
 pub use client::ExecutionStrategies;
@@ -26,6 +26,7 @@ use runtime_primitives::BuildStorage;
 use serde::{Serialize, de::DeserializeOwned};
 use target_info::Target;
 use tel::TelemetryEndpoints;
+use primitives::crypto::Protected;
 
 /// Service configuration.
 #[derive(Clone)]
@@ -43,13 +44,15 @@ pub struct Configuration<C, G: Serialize + DeserializeOwned + BuildStorage> {
 	/// Network configuration.
 	pub network: NetworkConfiguration,
 	/// Path to key files.
-	pub keystore_path: String,
+	pub keystore_path: PathBuf,
 	/// Path to the database.
 	pub database_path: String,
 	/// Cache Size for internal database in MiB
 	pub database_cache_size: Option<u32>,
 	/// Size of internal state cache in Bytes
 	pub state_cache_size: usize,
+	/// Size in percent of cache size dedicated to child tries
+	pub state_cache_child_ratio: Option<usize>,
 	/// Pruning settings.
 	pub pruning: PruningMode,
 	/// Additional key seeds.
@@ -66,6 +69,8 @@ pub struct Configuration<C, G: Serialize + DeserializeOwned + BuildStorage> {
 	pub rpc_http: Option<SocketAddr>,
 	/// RPC over Websockets binding address. `None` if disabled.
 	pub rpc_ws: Option<SocketAddr>,
+	/// Maximum number of connections for WebSockets RPC server. `None` if default.
+	pub rpc_ws_max_connections: Option<usize>,
 	/// CORS settings for HTTP & WS servers. `None` if all origins are allowed.
 	pub rpc_cors: Option<Vec<String>>,
 	/// Telemetry service URL. `None` if disabled.
@@ -79,7 +84,7 @@ pub struct Configuration<C, G: Serialize + DeserializeOwned + BuildStorage> {
 	/// Disable GRANDPA when running in validator mode
 	pub disable_grandpa: bool,
 	/// Node keystore's password
-	pub password: String,
+	pub keystore_password: Option<Protected<String>>,
 }
 
 impl<C: Default, G: Serialize + DeserializeOwned + BuildStorage> Configuration<C, G> {
@@ -98,19 +103,21 @@ impl<C: Default, G: Serialize + DeserializeOwned + BuildStorage> Configuration<C
 			database_path: Default::default(),
 			database_cache_size: Default::default(),
 			state_cache_size: Default::default(),
+			state_cache_child_ratio: Default::default(),
 			keys: Default::default(),
 			custom: Default::default(),
 			pruning: PruningMode::default(),
 			execution_strategies: Default::default(),
 			rpc_http: None,
 			rpc_ws: None,
+			rpc_ws_max_connections: None,
 			rpc_cors: Some(vec![]),
 			telemetry_endpoints: None,
 			default_heap_pages: None,
 			offchain_worker: Default::default(),
 			force_authoring: false,
 			disable_grandpa: false,
-			password: "".to_string(),
+			keystore_password: None,
 		};
 		configuration.network.boot_nodes = configuration.chain_spec.boot_nodes().to_vec();
 
