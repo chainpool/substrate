@@ -19,7 +19,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::{sync::Arc, convert::TryInto};
+use std::sync::Arc;
 
 use client::{self, Client};
 use rpc::futures::{Sink, Future};
@@ -28,7 +28,7 @@ use api::Subscriptions;
 use jsonrpc_pubsub::{typed::Subscriber, SubscriptionId};
 use log::warn;
 use codec::{Encode, Decode};
-use primitives::{Bytes, Blake2Hasher, H256, traits::BareCryptoStorePtr};
+use primitives::{Bytes, Blake2Hasher, H256};
 use sr_primitives::{generic, traits::{self, ProvideRuntimeApi}};
 use transaction_pool::{
 	txpool::{
@@ -44,7 +44,7 @@ use transaction_pool::{
 
 /// Re-export the API for backward compatibility.
 pub use api::author::*;
-use self::error::{Error, Result};
+use self::error::Result;
 
 /// Authoring API
 pub struct Author<B, E, P, RA> where P: PoolChainApi + Sync + Send + 'static {
@@ -54,8 +54,6 @@ pub struct Author<B, E, P, RA> where P: PoolChainApi + Sync + Send + 'static {
 	pool: Arc<Pool<P>>,
 	/// Subscriptions manager
 	subscriptions: Subscriptions,
-	/// The key store.
-	keystore: BareCryptoStorePtr,
 }
 
 impl<B, E, P, RA> Author<B, E, P, RA> where P: PoolChainApi + Sync + Send + 'static {
@@ -64,13 +62,11 @@ impl<B, E, P, RA> Author<B, E, P, RA> where P: PoolChainApi + Sync + Send + 'sta
 		client: Arc<Client<B, E, <P as PoolChainApi>::Block, RA>>,
 		pool: Arc<Pool<P>>,
 		subscriptions: Subscriptions,
-		keystore: BareCryptoStorePtr,
 	) -> Self {
 		Author {
 			client,
 			pool,
 			subscriptions,
-			keystore,
 		}
 	}
 }
@@ -83,7 +79,6 @@ impl<B, E, P, RA> AuthorApi<ExHash<P>, BlockHash<P>> for Author<B, E, P, RA> whe
 	P::Error: 'static,
 	RA: Send + Sync + 'static,
 	Client<B, E, P::Block, RA>: ProvideRuntimeApi,
-//	<Client<B, E, P::Block, RA> as ProvideRuntimeApi>::Api: SessionKeys<P::Block>,
 {
 	type Metadata = crate::metadata::Metadata;
 

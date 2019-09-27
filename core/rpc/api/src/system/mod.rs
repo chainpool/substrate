@@ -52,16 +52,16 @@ pub trait SystemApi<Hash, Number> {
 	/// - connected to some peers (unless running in dev mode)
 	/// - not performing a major sync
 	#[rpc(name = "system_health", returns = "Health")]
-	fn system_health(&self) -> Receiver<Health>;
+	fn system_health(&self) -> Result<Health>;
 
 	/// Returns currently connected peers
 	#[rpc(name = "system_peers", returns = "Vec<PeerInfo<Hash, Number>>")]
-	fn system_peers(&self) -> Receiver<Vec<PeerInfo<Hash, Number>>>;
+	fn system_peers(&self) -> Result<Vec<PeerInfo<Hash, Number>>>;
 
 	/// Returns current state of the network.
 	///
 	/// **Warning**: This API is not stable.
 	// TODO: make this stable and move structs https://github.com/paritytech/substrate/issues/1890
 	#[rpc(name = "system_networkState", returns = "jsonrpc_core::Value")]
-	fn system_network_state(&self) -> Receiver<jsonrpc_core::Value>;
+	fn system_network_state(&self) -> Result<network::NetworkState>;
 }

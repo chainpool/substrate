@@ -18,9 +18,9 @@
 
 #[cfg(test)]
 mod tests;
-
-use futures03::{channel::{mpsc, oneshot}, compat::Compat};
-use api::Receiver;
+use std::sync::Arc;
+//use futures03::{channel::{mpsc, oneshot}, compat::Compat};
+//use api::Receiver;
 use sr_primitives::traits::{self, Header as HeaderT};
 use self::error::Result;
 
@@ -31,31 +31,21 @@ pub use self::gen_client::Client as SystemClient;
 /// System API implementation
 pub struct System<B: traits::Block> {
 	info: SystemInfo,
-	send_back: mpsc::UnboundedSender<Request<B>>,
-}
-
-/// Request to be processed.
-pub enum Request<B: traits::Block> {
-	/// Must return the health of the network.
-	Health(oneshot::Sender<Health>),
-	/// Must return information about the peers we are connected to.
-	Peers(oneshot::Sender<Vec<PeerInfo<B::Hash, <B::Header as HeaderT>::Number>>>),
-	/// Must return the state of the network.
-	NetworkState(oneshot::Sender<rpc::Value>),
+	sync: Arc<dyn network::SyncProvider<B>>,
+	should_have_peers: bool,
 }
 
 impl<B: traits::Block> System<B> {
-	/// Creates new `System`.
-	///
-	/// The `send_back` will be used to transmit some of the requests. The user is responsible for
-	/// reading from that channel and answering the requests.
+	/// Creates new `System` given the `SystemInfo`.
 	pub fn new(
 		info: SystemInfo,
-		send_back: mpsc::UnboundedSender<Request<B>>
+		sync: Arc<dyn network::SyncProvider<B>>,
+		should_have_peers: bool,
 	) -> Self {
 		System {
 			info,
-			send_back,
+			should_have_peers,
+			sync,
 		}
 	}
 }
@@ -77,21 +67,25 @@ impl<B: traits::Block> SystemApi<B::Hash, <B::Header as HeaderT>::Number> for Sy
 		Ok(self.info.properties.clone())
 	}
 
-	fn system_health(&self) -> Receiver<Health> {
-		let (tx, rx) = oneshot::channel();
-		let _ = self.send_back.unbounded_send(Request::Health(tx));
-		Receiver(Compat::new(rx))
+	fn system_health(&self) -> Result<Health> {
+		Ok(Health {
+			peers: self.sync.peers().len(),
+			is_syncing: self.sync.is_major_syncing(),
+			should_have_peers: self.should_have_peers,
+		})
 	}
 
-	fn system_peers(&self) -> Receiver<Vec<PeerInfo<B::Hash, <B::Header as HeaderT>::Number>>> {
-		let (tx, rx) = oneshot::channel();
-		let _ = self.send_back.unbounded_send(Request::Peers(tx));
-		Receiver(Compat::new(rx))
+	fn system_peers(&self) -> Result<Vec<PeerInfo<B::Hash, <B::Header as HeaderT>::Number>>> {
+		Ok(self.sync.peers().into_iter().map(|(peer_id, p)| PeerInfo {
+			peer_id: peer_id.to_base58(),
+			roles: format!("{:?}", p.roles),
+			protocol_version: p.protocol_version,
+			best_hash: p.best_hash,
+			best_number: p.best_number,
+		}).collect())
 	}
 
-	fn system_network_state(&self) -> Receiver<rpc::Value> {
-		let (tx, rx) = oneshot::channel();
-		let _ = self.send_back.unbounded_send(Request::NetworkState(tx));
-		Receiver(Compat::new(rx))
+	fn system_network_state(&self) -> Result<network::NetworkState> {
+		Ok(self.sync.network_state())
 	}
 }

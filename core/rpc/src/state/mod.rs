@@ -300,10 +300,10 @@ pub fn new_full<B, E, Block: BlockT, RA>(
 
 /// Create new state API that works on light node.
 pub fn new_light<B, E, Block: BlockT, RA, F: Fetcher<Block>>(
-	client: Arc<Client<B, E, Block, RA>>,
-	subscriptions: Subscriptions,
-	remote_blockchain: Arc<dyn RemoteBlockchain<Block>>,
-	fetcher: Arc<F>,
+	_client: Arc<Client<B, E, Block, RA>>,
+	_subscriptions: Subscriptions,
+	_remote_blockchain: Arc<dyn RemoteBlockchain<Block>>,
+	_fetcher: Arc<F>,
 ) -> State<B, E, Block, RA>
 	where
 		Block: BlockT<Hash=H256> + 'static,
