@@ -102,7 +102,7 @@ pub use service_integration::{LinkHalfForService, BlockImportForService};
 pub use communication::Network;
 pub use finality_proof::FinalityProofProvider;
 //pub use light_import::light_block_import;
-pub use observer::run_grandpa_observer;
+//pub use observer::run_grandpa_observer;
 
 use aux_schema::PersistentData;
 use environment::{CompletedRound, CompletedRounds, Environment, HasVoted, SharedVoterSetState, VoterSetState};
@@ -459,6 +459,7 @@ pub struct GrandpaParams<'a, B, E, Block: BlockT<Hash=H256>, N, RA, SC, X> {
 	pub telemetry_on_connect: Option<TelemetryOnConnect<'a>>,
 }
 
+/*
 /// Run a GRANDPA voter as a task. Provide configuration and a link to a
 /// block import worker that has already been instantiated with `block_import`.
 pub fn run_grandpa_voter<B, E, Block: BlockT<Hash=H256>, N, RA, SC, X>(
@@ -732,3 +733,4 @@ pub fn run_grandpa<B, E, Block: BlockT<Hash=H256>, N, RA, SC, X>(
 {
 	run_grandpa_voter(grandpa_params)
 }
+*/

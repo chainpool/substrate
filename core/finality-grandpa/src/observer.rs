@@ -139,7 +139,7 @@ fn grandpa_observer<B, E, Block: BlockT<Hash=H256>, RA, S>(
 
 	observer.map(|_| ())
 }
-
+/*
 /// Run a GRANDPA observer as a task, the observer will finalize blocks only by
 /// listening for and validating GRANDPA commits instead of following the full
 /// protocol. Provide configuration and a link to a block import worker that has
@@ -275,3 +275,4 @@ pub fn run_grandpa_observer<B, E, Block: BlockT<Hash=H256>, N, RA, SC>(
 
 	Ok(observer_work.select(on_exit).map(|_| ()).map_err(|_| ()))
 }
+*/

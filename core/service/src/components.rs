@@ -132,6 +132,8 @@ pub type PoolApi<C> = <C as Components>::TransactionPoolApi;
 pub trait RuntimeGenesis: Serialize + DeserializeOwned + BuildStorage {}
 impl<T: Serialize + DeserializeOwned + BuildStorage> RuntimeGenesis for T {}
 
+pub type RpcExtension = jsonrpc_core::IoHandler<rpc::Metadata>;
+
 /// Something that can start the RPC service.
 pub trait StartRPC<C: Components> {
 	type ServersHandle: Send + Sync;
@@ -147,7 +149,7 @@ pub trait StartRPC<C: Components> {
 		rpc_ws_max_connections: Option<usize>,
 		task_executor: Arc<TaskExecutor>,
 		transaction_pool: Arc<TransactionPool<C::TransactionPoolApi>>,
-		rpc_extensions: impl rpc::RpcExtension<rpc::Metadata> + Clone,
+		rpc_extensions: Option<impl rpc::RpcExtension<rpc::Metadata> + Clone>,
 	) -> Result<Box<dyn std::any::Any + Send + Sync>, error::Error> ;
 }
 
@@ -168,7 +170,7 @@ impl<C: Components> StartRPC<Self> for C where
 		rpc_ws_max_connections: Option<usize>,
 		task_executor: Arc<TaskExecutor>,
 		transaction_pool: Arc<TransactionPool<C::TransactionPoolApi>>,
-		rpc_extensions: impl rpc::RpcExtension<rpc::Metadata> + Clone,
+		rpc_extensions: Option<impl rpc::RpcExtension<rpc::Metadata> + Clone>,
 	) -> Result<Box<dyn std::any::Any + Send + Sync>, error::Error>  {
 		let handler = || {
 			use rpc::{chain, state, author, system};
@@ -183,13 +185,21 @@ impl<C: Components> StartRPC<Self> for C where
 				transaction_pool.clone(),
 				subscriptions,
 			);
-			rpc_servers::rpc_handler((
-				state::StateApi::to_delegate(state),
-				chain::ChainApi::to_delegate(chain),
-				author::AuthorApi::to_delegate(author),
-				system::SystemApi::to_delegate(system),
-				rpc_extensions.clone(),
-			))
+			match rpc_extensions.clone() {
+				Some(e) => rpc_servers::rpc_handler((
+					state::StateApi::to_delegate(state),
+					chain::ChainApi::to_delegate(chain),
+					author::AuthorApi::to_delegate(author),
+					system::SystemApi::to_delegate(system),
+					e,
+				)),
+				None => rpc_servers::rpc_handler((
+					state::StateApi::to_delegate(state),
+					chain::ChainApi::to_delegate(chain),
+					author::AuthorApi::to_delegate(author),
+					system::SystemApi::to_delegate(system),
+				))
+			}
 		};
 
 //		let rpc_handles = handler();
@@ -342,7 +352,8 @@ pub trait ServiceFactory: 'static + Sized {
 	/// Build the Fork Choice algorithm for full client
 	fn build_select_chain(
 		config: &mut FactoryFullConfiguration<Self>,
-		client: Arc<FullClient<Self>>, 
+		client: Arc<FullClient<Self>>,
+		backend: Arc<FullBackend<Self>>,
 	) -> Result<Self::SelectChain, error::Error>;
 
 	/// Build full service.
@@ -440,7 +451,8 @@ pub trait Components: Sized + 'static {
 	/// Build fork choice selector
 	fn build_select_chain(
 		config: &mut FactoryFullConfiguration<Self::Factory>,
-		client: Arc<ComponentClient<Self>>
+		client: Arc<ComponentClient<Self>>,
+		backend: Arc<Self::Backend>,
 	) -> Result<Option<Self::SelectChain>, error::Error>;
 }
 
@@ -453,12 +465,12 @@ impl<Factory: ServiceFactory> FullComponents<Factory> {
 	/// Create new `FullComponents`
 	pub fn new(
 		config: FactoryFullConfiguration<Factory>,
-		rpc_extensions: impl rpc::RpcExtension<rpc::Metadata> + Clone,
-		task_executor: TaskExecutor
+		task_executor: TaskExecutor,
+		rpc_ext_builder: impl FnOnce(Arc<FullClient<Factory>>) -> Option<RpcExtension>
 	) -> Result<Self, error::Error> {
 		Ok(
 			Self {
-				service: Service::new(config, rpc_extensions, task_executor)?,
+				service: Service::new(config, task_executor, rpc_ext_builder)?,
 			}
 		)
 	}
@@ -535,9 +547,10 @@ impl<Factory: ServiceFactory> Components for FullComponents<Factory> {
 
 	fn build_select_chain(
 		config: &mut FactoryFullConfiguration<Self::Factory>,
-		client: Arc<ComponentClient<Self>>
+		client: Arc<ComponentClient<Self>>,
+		backend: Arc<Self::Backend>,
 	) -> Result<Option<Self::SelectChain>, error::Error> {
-		Self::Factory::build_select_chain(config, client).map(Some)
+		Self::Factory::build_select_chain(config, client, backend).map(Some)
 	}
 
 	fn build_finality_proof_provider(

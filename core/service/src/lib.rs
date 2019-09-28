@@ -89,7 +89,11 @@ pub struct Service<Components: components::Components> {
 
 /// Creates bare client without any networking.
 pub fn new_client<Factory: components::ServiceFactory>(config: &FactoryFullConfiguration<Factory>)
-	-> Result<Arc<ComponentClient<components::FullComponents<Factory>>>, error::Error>
+	-> Result<(
+		Arc<ComponentClient<components::FullComponents<Factory>>>,
+		Arc<<components::FullComponents<Factory> as Components>::Backend>
+	),
+		error::Error>
 {
 	let executor = NativeExecutor::new(config.default_heap_pages);
 	let (client, _) = components::FullComponents::<Factory>::build_client(
@@ -97,7 +101,7 @@ pub fn new_client<Factory: components::ServiceFactory>(config: &FactoryFullConfi
 		executor,
 		None
 	)?;
-	Ok(client.0)
+	Ok(client)
 }
 
 /// Stream of events for connection established to a telemetry server.
@@ -124,8 +128,8 @@ impl<Components: components::Components> Service<Components> {
 	/// Creates a new service.
 	pub fn new(
 		mut config: FactoryFullConfiguration<Components::Factory>,
-		rpc_extensions: impl rpc::RpcExtension<rpc::Metadata> + Clone,
 		task_executor: TaskExecutor,
+		rpc_ext_builder: impl FnOnce(Arc<ComponentClient<Components>>) -> Option<components::RpcExtension>
 	) -> Result<Self, error::Error> {
 		let (signal, exit) = ::exit_future::signal();
 
@@ -133,20 +137,9 @@ impl<Components: components::Components> Service<Components> {
 		let executor = NativeExecutor::new(config.default_heap_pages);
 
 		let keystore = Keystore::open(config.keystore_path.clone(), config.keystore_password.clone())?;
-//		// Keep the public key for telemetry
-//		let public_key = match keystore.contents()?.get(0) {
-//			Some(public_key) => public_key.clone(),
-//			None => {
-//				let key = keystore.generate(&config.keystore_password.unwrap_or_default())?;
-//				let public_key = key.public();
-//				info!("Generated a new keypair: {:?}", public_key);
-//
-//				public_key
-//			}
-//		};
 
 		let ((client, backend), on_demand) = Components::build_client(&config, executor, Some(keystore.clone()))?;
-		let select_chain = Components::build_select_chain(&mut config, client.clone())?;
+		let select_chain = Components::build_select_chain(&mut config, client.clone(), backend.clone())?;
 		let import_queue = Box::new(Components::build_import_queue(
 			&mut config,
 			client.clone(),
@@ -311,6 +304,7 @@ impl<Components: components::Components> Service<Components> {
 
 
 		// RPC
+		let rpc_extensions = rpc_ext_builder(client.clone());
 		let system_info = rpc::system::SystemInfo {
 			chain_name: config.chain_spec.name().into(),
 			impl_name: config.impl_name.into(),
@@ -701,9 +695,10 @@ macro_rules! construct_service_factory {
 
 			fn build_select_chain(
 				config: &mut $crate::FactoryFullConfiguration<Self>,
-				client: Arc<$crate::FullClient<Self>>
+				client: Arc<$crate::FullClient<Self>>,
+				backend: Arc<$crate::FullBackend<Self>>,
 			) -> $crate::Result<Self::SelectChain, $crate::Error> {
-				( $( $select_chain_init )* ) (config, client)
+				( $( $select_chain_init )* ) (config, client, backend)
 			}
 
 			fn build_full_import_queue(
@@ -722,7 +717,7 @@ macro_rules! construct_service_factory {
 //			}
 
 			fn build_finality_proof_provider(
-				backend: Arc<$crate::FullBackend>, client: Arc<$crate::FullClient<Self>>,
+				backend: Arc<$crate::FullBackend<Self>>, client: Arc<$crate::FullClient<Self>>,
 			) -> Result<Option<Arc<$crate::FinalityProofProvider<Self::Block>>>, $crate::Error> {
 				( $( $finality_proof_provider_init )* ) (backend, client)
 			}

@@ -46,7 +46,7 @@ pub fn export_blocks<F, E, W>(
 	E: Future<Item=(),Error=()> + Send + 'static,
 	W: Write,
 {
-	let client = new_client::<F>(&config)?;
+	let (client, _backend) = new_client::<F>(&config)?;
 	let mut block = from;
 
 	let last = match to {
@@ -125,9 +125,9 @@ pub fn import_blocks<F, E, R>(
 ) -> error::Result<()>
 	where F: ServiceFactory, E: Future<Item=(),Error=()> + Send + 'static, R: Read,
 {
-	let client = new_client::<F>(&config)?;
+	let (client, backend) = new_client::<F>(&config)?;
 	// FIXME #1134 this shouldn't need a mutable config.
-	let select_chain = components::FullComponents::<F>::build_select_chain(&mut config, client.clone())?;
+	let select_chain = components::FullComponents::<F>::build_select_chain(&mut config, client.clone(), backend.clone())?;
 	let queue = components::FullComponents::<F>::build_import_queue(&mut config, client.clone(), select_chain)?;
 
 	let (wait_send, wait_recv) = std::sync::mpsc::channel();
@@ -198,7 +198,7 @@ pub fn revert_chain<F>(
 ) -> error::Result<()>
 	where F: ServiceFactory,
 {
-	let client = new_client::<F>(&config)?;
+	let (client, _backend) = new_client::<F>(&config)?;
 	let reverted = client.revert(blocks)?;
 	let info = client.info().chain;
 
