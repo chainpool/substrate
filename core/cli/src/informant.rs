@@ -45,87 +45,85 @@ pub fn start<C>(service: &Service<C>, exit: ::exit_future::Exit, handle: TaskExe
 	let self_pid = get_current_pid();
 
 	let display_notifications = network.status().for_each(move |sync_status| {
+		let info = client.info();
+		let best_number: u64 = info.chain.best_number.as_();
+		let best_hash = info.chain.best_hash;
+		let num_peers = sync_status.num_peers;
+		let speed = move || speed(best_number, last_number, last_update);
+		last_update = time::Instant::now();
+		let (status, target) = match (sync_status.sync.state, sync_status.sync.best_seen_block) {
+			(SyncState::Idle, _) => ("Idle".into(), "".into()),
+			(SyncState::Downloading, None) => (format!("Syncing{}", speed()), "".into()),
+			(SyncState::Downloading, Some(n)) => (format!("Syncing{}", speed()), format!(", target=#{}", n)),
+		};
+		last_number = Some(best_number);
+		let txpool_status = txpool.status();
+		let finalized_number: u64 = info.chain.finalized_number.as_();
+		let bandwidth_download = network.average_download_per_sec();
+		let bandwidth_upload = network.average_upload_per_sec();
+		info!(
+			target: "substrate",
+			"{}{} ({} peers), best: #{} ({}), finalized #{} ({}), ⬇ {} ⬆ {}",
+			Colour::White.bold().paint(&status),
+			target,
+			Colour::White.bold().paint(format!("{}", sync_status.num_peers)),
+			Colour::White.paint(format!("{}", best_number)),
+			best_hash,
+			Colour::White.paint(format!("{}", finalized_number)),
+			info.chain.finalized_hash,
+			TransferRateFormat(bandwidth_download),
+			TransferRateFormat(bandwidth_upload),
+		);
 
-		if let Ok(info) = client.info() {
-			let best_number: u64 = info.chain.best_number.as_();
-			let best_hash = info.chain.best_hash;
-			let num_peers = sync_status.num_peers;
-			let speed = move || speed(best_number, last_number, last_update);
-			last_update = time::Instant::now();
-			let (status, target) = match (sync_status.sync.state, sync_status.sync.best_seen_block) {
-				(SyncState::Idle, _) => ("Idle".into(), "".into()),
-				(SyncState::Downloading, None) => (format!("Syncing{}", speed()), "".into()),
-				(SyncState::Downloading, Some(n)) => (format!("Syncing{}", speed()), format!(", target=#{}", n)),
-			};
-			last_number = Some(best_number);
-			let txpool_status = txpool.status();
-			let finalized_number: u64 = info.chain.finalized_number.as_();
-			let bandwidth_download = network.average_download_per_sec();
-			let bandwidth_upload = network.average_upload_per_sec();
-			info!(
-				target: "substrate",
-				"{}{} ({} peers), best: #{} ({}), finalized #{} ({}), ⬇ {} ⬆ {}",
-				Colour::White.bold().paint(&status),
-				target,
-				Colour::White.bold().paint(format!("{}", sync_status.num_peers)),
-				Colour::White.paint(format!("{}", best_number)),
-				best_hash,
-				Colour::White.paint(format!("{}", finalized_number)),
-				info.chain.finalized_hash,
-				TransferRateFormat(bandwidth_download),
-				TransferRateFormat(bandwidth_upload),
-			);
+		let backend = (*client).backend();
+		let used_state_cache_size = match backend.used_state_cache_size(){
+			Some(size) => size,
+			None => 0,
+		};
 
-			let backend = (*client).backend();
-			let used_state_cache_size = match backend.used_state_cache_size(){
-				Some(size) => size,
-				None => 0,
-			};
+		// get cpu usage and memory usage of this process
+		let (cpu_usage, memory) = if sys.refresh_process(self_pid) {
+			let proc = sys.get_process(self_pid).expect("Above refresh_process succeeds, this should be Some(), qed");
+			(proc.cpu_usage(), proc.memory())
+		} else { (0.0, 0) };
 
-			// get cpu usage and memory usage of this process
-			let (cpu_usage, memory) = if sys.refresh_process(self_pid) {
-				let proc = sys.get_process(self_pid).expect("Above refresh_process succeeds, this should be Some(), qed");
-				(proc.cpu_usage(), proc.memory())
-			} else { (0.0, 0) };
+		let network_state = network.network_state();
 
-			let network_state = network.network_state();
+		telemetry!(
+			SUBSTRATE_INFO;
+			"system.interval";
+			"network_state" => network_state,
+			"status" => format!("{}{}", status, target),
+			"peers" => num_peers,
+			"height" => best_number,
+			"best" => ?best_hash,
+			"txcount" => txpool_status.ready,
+			"cpu" => cpu_usage,
+			"memory" => memory,
+			"finalized_height" => finalized_number,
+			"finalized_hash" => ?info.chain.finalized_hash,
+			"bandwidth_download" => bandwidth_download,
+			"bandwidth_upload" => bandwidth_upload,
+			"used_state_cache_size" => used_state_cache_size,
+		);
 
-			telemetry!(
-				SUBSTRATE_INFO;
-				"system.interval";
-				"network_state" => network_state,
-				"status" => format!("{}{}", status, target),
-				"peers" => num_peers,
-				"height" => best_number,
-				"best" => ?best_hash,
-				"txcount" => txpool_status.ready,
-				"cpu" => cpu_usage,
-				"memory" => memory,
-				"finalized_height" => finalized_number,
-				"finalized_hash" => ?info.chain.finalized_hash,
-				"bandwidth_download" => bandwidth_download,
-				"bandwidth_upload" => bandwidth_upload,
-				"used_state_cache_size" => used_state_cache_size,
-			);
-		} else {
-			warn!("Error getting best block information");
-		}
 
 		Ok(())
 	});
 
 	let client = service.client();
-	let mut last = match client.info() {
-		Ok(info) => Some((info.chain.best_number, info.chain.best_hash)),
-		Err(e) => { warn!("Error getting best block information: {:?}", e); None }
+	let mut last_best = {
+		let info = client.info();
+		Some((info.chain.best_number, info.chain.best_hash))
 	};
 
 	let display_block_import = client.import_notification_stream().for_each(move |n| {
 		// detect and log reorganizations.
-		if let Some((ref last_num, ref last_hash)) = last {
-			if n.header.parent_hash() != last_hash {
+		if let Some((ref last_num, ref last_hash)) = last_best {
+			if n.header.parent_hash() != last_hash && n.is_new_best  {
 				let tree_route = ::client::blockchain::tree_route(
-					client.backend().blockchain(),
+					|id| client.header(&id)?.ok_or_else(
+						|| client::error::Error::UnknownBlock(format!("{:?}", id))),
 					BlockId::Hash(last_hash.clone()),
 					BlockId::Hash(n.hash),
 				);
@@ -143,7 +141,9 @@ pub fn start<C>(service: &Service<C>, exit: ::exit_future::Exit, handle: TaskExe
 			}
 		}
 
-		last = Some((n.header.number().clone(), n.hash.clone()));
+		if n.is_new_best {
+			last_best = Some((n.header.number().clone(), n.hash.clone()));
+		}
 
 		info!(target: "substrate", "Imported #{} ({})", n.header.number(), n.hash);
 		Ok(())

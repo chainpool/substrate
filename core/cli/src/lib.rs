@@ -27,6 +27,8 @@ pub mod informant;
 
 use client::ExecutionStrategies;
 use runtime_primitives::traits::As;
+use runtime_primitives::BuildStorage;
+use serde::{Serialize, de::DeserializeOwned};
 use service::{
 	ServiceFactory, FactoryFullConfiguration, RuntimeGenesis,
 	FactoryGenesis, PruningMode, ChainSpec,
@@ -205,12 +207,12 @@ where
 	I: IntoIterator<Item = T>,
 	T: Into<std::ffi::OsString> + Clone,
 {
-	panic_handler::set(version.support_url);
-
 	let full_version = service::config::full_version_from_strs(
 		version.version,
 		version.commit
 	);
+
+	panic_handler::set(version.support_url, &full_version);
 
 	let matches = CoreParams::<CC, RP>::clap()
 		.name(version.executable_name)
@@ -370,6 +372,25 @@ fn input_keystore_password() -> Result<String, String> {
 		.map_err(|e| format!("{:?}", e))
 }
 
+/// Fill the password field of the given config instance.
+fn fill_config_keystore_password<C, G: Serialize + DeserializeOwned + BuildStorage>(
+	config: &mut service::Configuration<C, G>,
+	cli: &RunCmd,
+) -> Result<(), String> {
+	config.keystore_password = if cli.password_interactive {
+		Some(input_keystore_password()?.into())
+	} else if let Some(ref file) = cli.password_filename {
+		Some(fs::read_to_string(file).map_err(|e| format!("{}", e))?.into())
+	} else if let Some(ref password) = cli.password {
+		Some(password.clone().into())
+	} else {
+		None
+	};
+
+	Ok(())
+}
+
+
 fn create_run_node_config<F, S>(
 	cli: RunCmd, spec_factory: S, impl_name: &'static str, version: &VersionInfo
 ) -> error::Result<FactoryFullConfiguration<F>>
@@ -379,9 +400,8 @@ where
 {
 	let spec = load_spec(&cli.shared_params, spec_factory)?;
 	let mut config = service::Configuration::default_with_spec(spec.clone());
-	if cli.interactive_password {
-		config.password = input_keystore_password()?
-	}
+
+	fill_config_keystore_password(&mut config, &cli)?;
 
 	config.impl_name = impl_name;
 	config.impl_commit = version.commit;
@@ -405,10 +425,9 @@ where
 
 	let base_path = base_path(&cli.shared_params, version);
 
-	config.keystore_path = cli.keystore_path
-		.unwrap_or_else(|| keystore_path(&base_path, config.chain_spec.id()))
-		.to_string_lossy()
-		.into();
+	config.keystore_path = cli.keystore_path.unwrap_or_else(
+		|| keystore_path(&base_path, config.chain_spec.id())
+	);
 
 	config.database_path =
 		db_path(&base_path, config.chain_spec.id()).to_string_lossy().into();

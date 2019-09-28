@@ -289,10 +289,6 @@ pub struct ExecutionStrategies {
 /// The `run` command used to run a node.
 #[derive(Debug, StructOpt, Clone)]
 pub struct RunCmd {
-	/// Specify custom keystore path
-	#[structopt(long = "keystore-path", value_name = "PATH", parse(from_os_str))]
-	pub keystore_path: Option<PathBuf>,
-
 	/// Specify additional key seed
 	#[structopt(long = "key", value_name = "STRING")]
 	pub key: Option<String>,
@@ -396,9 +392,32 @@ pub struct RunCmd {
 	#[structopt(long = "force-authoring")]
 	pub force_authoring: bool,
 
-	/// Interactive password for validator key.
-	#[structopt(short = "i")]
-	pub interactive_password: bool,
+	/// Specify custom keystore path.
+	#[structopt(long = "keystore-path", value_name = "PATH", parse(from_os_str))]
+	pub keystore_path: Option<PathBuf>,
+
+	/// Use interactive shell for entering the password used by the keystore.
+	#[structopt(
+		long = "password-interactive",
+		raw(conflicts_with_all = "&[ \"password\", \"password_filename\" ]")
+	)]
+	pub password_interactive: bool,
+
+	/// Password used by the keystore.
+	#[structopt(
+		long = "password",
+		raw(conflicts_with_all = "&[ \"password_interactive\", \"password_filename\" ]")
+	)]
+	pub password: Option<String>,
+
+	/// File that contains the password used by the keystore.
+	#[structopt(
+		long = "password-filename",
+		value_name = "PATH",
+		parse(from_os_str),
+		raw(conflicts_with_all = "&[ \"password_interactive\", \"password\" ]")
+	)]
+	pub password_filename: Option<PathBuf>
 }
 
 /// Stores all required Cli values for a keyring test account.
@@ -406,15 +425,15 @@ struct KeyringTestAccountCliValues {
 	help: String,
 	conflicts_with: Vec<String>,
 	name: String,
-	variant: keyring::AuthorityKeyring,
+	variant: keyring::Ed25519Keyring,
 }
 
 lazy_static::lazy_static! {
 	/// The Cli values for all test accounts.
 	static ref TEST_ACCOUNTS_CLI_VALUES: Vec<KeyringTestAccountCliValues> = {
-		keyring::AuthorityKeyring::iter().map(|a| {
+		keyring::Ed25519Keyring::iter().map(|a| {
 			let help = format!("Shortcut for `--key //{} --name {}`.", a, a);
-			let conflicts_with = keyring::AuthorityKeyring::iter()
+			let conflicts_with = keyring::Ed25519Keyring::iter()
 				.filter(|b| a != *b)
 				.map(|b| b.to_string().to_lowercase())
 				.chain(["name", "key"].iter().map(|s| s.to_string()))
@@ -434,7 +453,7 @@ lazy_static::lazy_static! {
 /// Wrapper for exposing the keyring test accounts into the Cli.
 #[derive(Debug, Clone)]
 pub struct Keyring {
-	pub account: Option<keyring::AuthorityKeyring>,
+	pub account: Option<keyring::Ed25519Keyring>,
 }
 
 impl StructOpt for Keyring {
