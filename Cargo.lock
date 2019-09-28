@@ -2135,16 +2135,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "memory-db"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "hash-db 0.12.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "hashmap_core 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "heapsize 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "memory-db"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -4973,7 +4963,7 @@ version = "2.0.0"
 dependencies = [
  "cfg-if 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory-db 0.12.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory-db 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
  "sr-io 2.0.0",
@@ -4994,7 +4984,7 @@ dependencies = [
  "substrate-test-client 2.0.0",
  "substrate-trie 2.0.0",
  "substrate-wasm-builder-runner 1.0.3",
- "trie-db 0.12.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "trie-db 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -5487,18 +5477,6 @@ dependencies = [
  "trie-db 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "trie-root 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "trie-standardmap 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "trie-db"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "elastic-array 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "hash-db 0.12.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "hashmap_core 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -6302,7 +6280,6 @@ dependencies = [
 "checksum matches 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 "checksum memchr 2.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2efc7bc57c883d4a4d6e3246905283d8dae951bb3bd32f49d6ef297f546e1c39"
 "checksum memoffset 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0f9dc261e2b62d7a622bf416ea3c5245cdd5d9a7fcc428c0d06804dfce1775b3"
-"checksum memory-db 0.12.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7623b01a4f1b7acb7cf8e3f678f05e15e6ae26cb0b738dfeb5cc186fd6b82ef4"
 "checksum memory-db 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ef49315991403ba5fa225a70399df5e115f57b274cb0b1b4bcd6e734fa5bd783"
 "checksum memory_units 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "71d96e3f3c0b6325d8ccd83c33b28acb183edcb6c67938ba104ec546854b0882"
 "checksum merlin 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "66448a173ad394ef5ebf734efa724f3644dcffda083b1e89979da4461ddac079"
@@ -6497,7 +6474,6 @@ dependencies = [
 "checksum toml 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "c7aabe75941d914b72bf3e5d3932ed92ce0664d49d8432305a8b547c37227724"
 "checksum traitobject 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "efd1f82c56340fdf16f2a953d7bda4f8fdffba13d93b00844c25572110b26079"
 "checksum trie-bench 0.16.2 (registry+https://github.com/rust-lang/crates.io-index)" = "3073600c543ed001319d7e092c46dfd8c245af1a218ec5c75eb01582660a2b3e"
-"checksum trie-db 0.12.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1ba73747fd3a64ab531274c04cb588dfa9d30d972d62990831e63fbce2cfec59"
 "checksum trie-db 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d0b62d27e8aa1c07414549ac872480ac82380bab39e730242ab08d82d7cc098a"
 "checksum trie-root 0.12.2 (registry+https://github.com/rust-lang/crates.io-index)" = "cfa2e20c4f1418ac2e71ddc418e35e1b56e34022e2146209ffdbf1b2de8b1bd9"
 "checksum trie-root 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0b779f7c1c8fe9276365d9d5be5c4b5adeacf545117bb3f64c974305789c5c0b"

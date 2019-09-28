@@ -18,7 +18,7 @@
 //! and depositing logs.
 
 use rstd::prelude::*;
-use runtime_io::{storage_root, enumerated_trie_root, storage_changes_root, twox_128, blake2_256};
+use runtime_io::{storage_root, storage_changes_root, twox_128, blake2_256};
 use runtime_support::storage::{self, StorageValue, StorageMap};
 use runtime_support::storage_items;
 use runtime_primitives::traits::{Hash as HashT, BlakeTwo256, Digest as DigestT};
@@ -84,8 +84,7 @@ pub fn polish_block(block: &mut Block) {
 
 	// check transaction trie root represents the transactions.
 	let txs = block.extrinsics.iter().map(Encode::encode).collect::<Vec<_>>();
-	let txs = txs.iter().map(Vec::as_slice).collect::<Vec<_>>();
-	let txs_root = enumerated_trie_root::<Blake2Hasher>(&txs).into();
+	let txs_root = BlakeTwo256::ordered_trie_root(txs);
 	info_expect_equal_hash(&txs_root, &header.extrinsics_root);
 	header.extrinsics_root = txs_root;
 
@@ -100,7 +99,7 @@ pub fn polish_block(block: &mut Block) {
 
 	// check digest
 	let mut digest = Digest::default();
-	if let Some(storage_changes_root) = storage_changes_root(header.parent_hash.into(), header.number - 1) {
+	if let Some(storage_changes_root) = storage_changes_root(header.parent_hash.into()) {
 		digest.push(generic::DigestItem::ChangesTrieRoot(storage_changes_root.into()));
 	}
 	if let Some(new_authorities) = <NewAuthorities>::take() {
@@ -114,8 +113,7 @@ pub fn execute_block(block: Block) {
 
 	// check transaction trie root represents the transactions.
 	let txs = block.extrinsics.iter().map(Encode::encode).collect::<Vec<_>>();
-	let txs = txs.iter().map(Vec::as_slice).collect::<Vec<_>>();
-	let txs_root = enumerated_trie_root::<Blake2Hasher>(&txs).into();
+	let txs_root = BlakeTwo256::ordered_trie_root(txs);
 	info_expect_equal_hash(&txs_root, &header.extrinsics_root);
 	assert!(txs_root == header.extrinsics_root, "Transaction trie root must be valid.");
 
@@ -133,7 +131,7 @@ pub fn execute_block(block: Block) {
 
 	// check digest
 	let mut digest = Digest::default();
-	if let Some(storage_changes_root) = storage_changes_root(header.parent_hash.into(), header.number - 1) {
+	if let Some(storage_changes_root) = storage_changes_root(header.parent_hash.into()) {
 		digest.push(generic::DigestItem::ChangesTrieRoot(storage_changes_root.into()));
 	}
 	if let Some(new_authorities) = <NewAuthorities>::take() {
@@ -207,13 +205,11 @@ pub fn execute_transaction(utx: Extrinsic) -> ApplyResult {
 pub fn finalize_block() -> Header {
 	let extrinsic_index: u32 = storage::unhashed::take(well_known_keys::EXTRINSIC_INDEX).unwrap();
 	let txs: Vec<_> = (0..extrinsic_index).map(ExtrinsicData::take).collect();
-	let txs = txs.iter().map(Vec::as_slice).collect::<Vec<_>>();
-	let extrinsics_root = enumerated_trie_root::<Blake2Hasher>(&txs).into();
-
+	let extrinsics_root = BlakeTwo256::ordered_trie_root(txs).into();
 	let number = <Number>::take().expect("Number is set by `initialize_block`");
 	let parent_hash = <ParentHash>::take();
 	let storage_root = BlakeTwo256::storage_root();
-	let storage_changes_root = BlakeTwo256::storage_changes_root(parent_hash, number - 1);
+	let storage_changes_root = BlakeTwo256::storage_changes_root(parent_hash);
 
 	let mut digest = Digest::default();
 	if let Some(storage_changes_root) = storage_changes_root {
