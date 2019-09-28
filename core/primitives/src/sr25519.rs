@@ -54,6 +54,12 @@ pub struct Public(pub [u8; 32]);
 #[cfg(feature = "std")]
 pub struct Pair(Keypair);
 
+impl AsRef<Public> for Public {
+	fn as_ref(&self) -> &Public {
+		&self
+	}
+}
+
 #[cfg(feature = "std")]
 impl Clone for Pair {
 	fn clone(&self) -> Self {

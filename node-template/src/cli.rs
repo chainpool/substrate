@@ -27,11 +27,11 @@ pub fn run<I, T, E>(args: I, exit: E, version: VersionInfo) -> error::Result<()>
 			let runtime = Runtime::new().map_err(|e| format!("{:?}", e))?;
 			let executor = runtime.executor();
 			match config.roles {
-				ServiceRoles::LIGHT => run_until_exit(
-					runtime,
-				 	service::Factory::new_light(config, executor).map_err(|e| format!("{:?}", e))?,
-					exit
-				),
+//				ServiceRoles::LIGHT => run_until_exit(
+//					runtime,
+//				 	service::Factory::new_light(config, executor).map_err(|e| format!("{:?}", e))?,
+//					exit
+//				),
 				_ => run_until_exit(
 					runtime,
 					service::Factory::new_full(config, executor).map_err(|e| format!("{:?}", e))?,

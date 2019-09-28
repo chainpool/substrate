@@ -7,10 +7,10 @@ use log::info;
 use transaction_pool::{self, txpool::{Pool as TransactionPool}};
 use node_template_runtime::{self, GenesisConfig, opaque::Block, RuntimeApi};
 use substrate_service::{
-	FactoryFullConfiguration, LightComponents, FullComponents, FullBackend,
-	FullClient, LightClient, LightBackend, FullExecutor, LightExecutor,
+	FactoryFullConfiguration, FullComponents, FullBackend,
+	FullClient, FullExecutor,
 	TaskExecutor,
-	error::{Error as ServiceError, ErrorKind as ServiceErrorKind},
+	error::{Error as ServiceError},
 };
 use basic_authorship::ProposerFactory;
 use consensus::{import_queue, start_aura, AuraImportQueue, SlotDuration, NothingExtra};
@@ -67,7 +67,7 @@ construct_service_factory! {
 					});
 					let client = service.client();
 					let select_chain = service.select_chain()
-						.ok_or_else(|| ServiceError::from(ServiceErrorKind::SelectChainRequired))?;
+						.ok_or_else(|| ServiceError::from(ServiceError::SelectChainRequired))?;
 					executor.spawn(start_aura(
 						SlotDuration::get_or_compute(&*client)?,
 						key.clone(),
@@ -85,8 +85,8 @@ construct_service_factory! {
 				Ok(service)
 			}
 		},
-		LightService = LightComponents<Self>
-			{ |config, executor| <LightComponents<Factory>>::new(config, executor) },
+//		LightService = LightComponents<Self>
+//			{ |config, executor| <LightComponents<Factory>>::new(config, executor) },
 		FullImportQueue = AuraImportQueue<
 			Self::Block,
 		>
@@ -103,30 +103,30 @@ construct_service_factory! {
 					).map_err(Into::into)
 				}
 			},
-		LightImportQueue = AuraImportQueue<
-			Self::Block,
-		>
-			{ |config: &mut FactoryFullConfiguration<Self>, client: Arc<LightClient<Self>>| {
-					import_queue::<_, _, _, Pair>(
-						SlotDuration::get_or_compute(&*client)?,
-						client.clone(),
-						None,
-						None,
-						None,
-						client,
-						NothingExtra,
-						config.custom.inherent_data_providers.clone(),
-					).map_err(Into::into)
-				}
-			},
-		SelectChain = LongestChain<FullBackend<Self>, Self::Block>
-			{ |config: &FactoryFullConfiguration<Self>, client: Arc<FullClient<Self>>| {
-				Ok(LongestChain::new(
-					client.backend().clone(),
-					client.import_lock()
-				))
-			}
-		},
+//		LightImportQueue = AuraImportQueue<
+//			Self::Block,
+//		>
+//			{ |config: &mut FactoryFullConfiguration<Self>, client: Arc<LightClient<Self>>| {
+//					import_queue::<_, _, _, Pair>(
+//						SlotDuration::get_or_compute(&*client)?,
+//						client.clone(),
+//						None,
+//						None,
+//						None,
+//						client,
+//						NothingExtra,
+//						config.custom.inherent_data_providers.clone(),
+//					).map_err(Into::into)
+//				}
+//			},
+//		SelectChain = LongestChain<FullBackend<Self>, Self::Block>
+//			{ |config: &FactoryFullConfiguration<Self>, client: Arc<FullClient<Self>>| {
+//				Ok(LongestChain::new(
+//					client.backend().clone(),
+//					client.import_lock()
+//				))
+//			}
+//		},
 		FinalityProofProvider = { |_client: Arc<FullClient<Self>>| {
 			Ok(None)
 		}},

@@ -104,6 +104,12 @@ impl From<Pair> for Public {
 	}
 }
 
+impl AsRef<Public> for Public {
+	fn as_ref(&self) -> &Public {
+		&self
+	}
+}
+
 impl From<Public> for H256 {
 	fn from(x: Public) -> Self {
 		x.0.into()

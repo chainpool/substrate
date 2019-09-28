@@ -29,9 +29,9 @@ use primitives::{Pair as PairT, ed25519};
 use node_primitives::Block;
 use node_runtime::{GenesisConfig, RuntimeApi};
 use substrate_service::{
-	FactoryFullConfiguration, LightComponents, FullComponents, FullBackend,
-	FullClient, LightClient, LightBackend, FullExecutor, LightExecutor, TaskExecutor,
-	error::{Error as ServiceError, ErrorKind as ServiceErrorKind},
+	FactoryFullConfiguration, FullComponents, FullBackend,
+	FullClient, FullExecutor, TaskExecutor,
+	error::{Error as ServiceError},
 };
 use transaction_pool::{self, txpool::{Pool as TransactionPool}};
 use inherents::InherentDataProviders;
@@ -74,9 +74,11 @@ construct_service_factory! {
 //			{ |config, client| Ok(TransactionPool::new(config, transaction_pool::ChainApi::new(client))) },
 		Genesis = GenesisConfig,
 		Configuration = NodeConfig<Self>,
-		FullService = FullComponents<Self>
-			{ |config: FactoryFullConfiguration<Self>, executor: TaskExecutor|
-				FullComponents::<Factory>::new(config, executor) },
+		FullService = FullComponents<Self> {
+		 		|config: FactoryFullConfiguration<Self>, executor: TaskExecutor| {
+					FullComponents::<Factory>::new(config, executor, |_client| { None })
+				}
+			},
 		AuthoritySetup = {
 			|mut service: Self::FullService, executor: TaskExecutor, local_key: Option<Arc<ed25519::Pair>>| {
 				let (block_import, link_half) = service.config.custom.grandpa_import_setup.take()
@@ -92,7 +94,7 @@ construct_service_factory! {
 
 					let client = service.client();
 					let select_chain = service.select_chain()
-						.ok_or_else(|| ServiceError::from(ServiceErrorKind::SelectChainRequired))?;
+						.ok_or_else(|| ServiceError::from(ServiceError::SelectChainRequired))?;
 					executor.spawn(start_aura(
 						SlotDuration::get_or_compute(&*client)?,
 						key.clone(),
@@ -125,28 +127,28 @@ construct_service_factory! {
 
 				match config.local_key {
 					None => {
-						executor.spawn(grandpa::run_grandpa_observer(
-							config,
-							link_half,
-							service.network(),
-							service.on_exit(),
-						)?);
+//						executor.spawn(grandpa::run_grandpa_observer(
+//							config,
+//							link_half,
+//							service.network(),
+//							service.on_exit(),
+//						)?);
 					},
 					Some(_) => {
-						let telemetry_on_connect = TelemetryOnConnect {
-							on_exit: Box::new(service.on_exit()),
-							telemetry_connection_sinks: service.telemetry_on_connect_stream(),
-							executor: &executor,
-						};
-						let grandpa_config = grandpa::GrandpaParams {
-							config: config,
-							link: link_half,
-							network: service.network(),
-							inherent_data_providers: service.config.custom.inherent_data_providers.clone(),
-							on_exit: service.on_exit(),
-							telemetry_on_connect: Some(telemetry_on_connect),
-						};
-						executor.spawn(grandpa::run_grandpa_voter(grandpa_config)?);
+//						let telemetry_on_connect = TelemetryOnConnect {
+//							on_exit: Box::new(service.on_exit()),
+//							telemetry_connection_sinks: service.telemetry_on_connect_stream(),
+//							executor: &executor,
+//						};
+//						let grandpa_config = grandpa::GrandpaParams {
+//							config: config,
+//							link: link_half,
+//							network: service.network(),
+//							inherent_data_providers: service.config.custom.inherent_data_providers.clone(),
+//							on_exit: service.on_exit(),
+//							telemetry_on_connect: Some(telemetry_on_connect),
+//						};
+//						executor.spawn(grandpa::run_grandpa_voter(grandpa_config)?);
 					},
 				}
 
@@ -203,14 +205,11 @@ construct_service_factory! {
 //				).map_err(Into::into)
 //			}},
 		SelectChain = LongestChain<FullBackend<Self>, Self::Block>
-			{ |config: &FactoryFullConfiguration<Self>, client: Arc<FullClient<Self>>| {
-				Ok(LongestChain::new(
-					client.backend().clone(),
-					client.import_lock()
-				))
+			{ |_config: &FactoryFullConfiguration<Self>, _client: Arc<FullClient<Self>>, backend: Arc<FullBackend<Self>>| {
+				Ok(LongestChain::new(backend.clone()))
 			}
 		},
-		FinalityProofProvider = { |client: Arc<FullClient<Self>>, backend: Arc<FullBackend>| {
+		FinalityProofProvider = { |backend: Arc<FullBackend<Self>>, client: Arc<FullClient<Self>>| {
 			Ok(Some(Arc::new(GrandpaFinalityProofProvider::new(backend, client)) as _))
 		}},
 	}
