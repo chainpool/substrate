@@ -70,8 +70,8 @@ construct_service_factory! {
 		RuntimeDispatch = node_executor::Executor,
 		FullTransactionPoolApi = transaction_pool::ChainApi<client::Client<FullBackend<Self>, FullExecutor<Self>, Block, RuntimeApi>, Block>
 			{ |config, client| Ok(TransactionPool::new(config, transaction_pool::ChainApi::new(client))) },
-		LightTransactionPoolApi = transaction_pool::ChainApi<client::Client<LightBackend<Self>, LightExecutor<Self>, Block, RuntimeApi>, Block>
-			{ |config, client| Ok(TransactionPool::new(config, transaction_pool::ChainApi::new(client))) },
+//		LightTransactionPoolApi = transaction_pool::ChainApi<client::Client<LightBackend<Self>, LightExecutor<Self>, Block, RuntimeApi>, Block>
+//			{ |config, client| Ok(TransactionPool::new(config, transaction_pool::ChainApi::new(client))) },
 		Genesis = GenesisConfig,
 		Configuration = NodeConfig<Self>,
 		FullService = FullComponents<Self>
@@ -153,8 +153,8 @@ construct_service_factory! {
 				Ok(service)
 			}
 		},
-		LightService = LightComponents<Self>
-			{ |config, executor| <LightComponents<Factory>>::new(config, executor) },
+//		LightService = LightComponents<Self>
+//			{ |config, executor| <LightComponents<Factory>>::new(config, executor) },
 		FullImportQueue = AuraImportQueue<Self::Block>
 			{ |config: &mut FactoryFullConfiguration<Self> , client: Arc<FullClient<Self>>, select_chain: Self::SelectChain| {
 				let slot_duration = SlotDuration::get_or_compute(&*client)?;
@@ -178,30 +178,30 @@ construct_service_factory! {
 					config.custom.inherent_data_providers.clone(),
 				).map_err(Into::into)
 			}},
-		LightImportQueue = AuraImportQueue<Self::Block>
-			{ |config: &FactoryFullConfiguration<Self>, client: Arc<LightClient<Self>>| {
-				let fetch_checker = client.backend().blockchain().fetcher()
-					.upgrade()
-					.map(|fetcher| fetcher.checker().clone())
-					.ok_or_else(|| "Trying to start light import queue without active fetch checker")?;
-				let block_import = grandpa::light_block_import::<_, _, _, RuntimeApi, LightClient<Self>>(
-					client.clone(), Arc::new(fetch_checker), client.clone()
-				)?;
-				let block_import = Arc::new(block_import);
-				let finality_proof_import = block_import.clone();
-				let finality_proof_request_builder = finality_proof_import.create_finality_proof_request_builder();
-
-				import_queue::<_, _, _, ed25519::Pair>(
-					SlotDuration::get_or_compute(&*client)?,
-					block_import,
-					None,
-					Some(finality_proof_import),
-					Some(finality_proof_request_builder),
-					client,
-					NothingExtra,
-					config.custom.inherent_data_providers.clone(),
-				).map_err(Into::into)
-			}},
+//		LightImportQueue = AuraImportQueue<Self::Block>
+//			{ |config: &FactoryFullConfiguration<Self>, client: Arc<LightClient<Self>>| {
+//				let fetch_checker = client.backend().blockchain().fetcher()
+//					.upgrade()
+//					.map(|fetcher| fetcher.checker().clone())
+//					.ok_or_else(|| "Trying to start light import queue without active fetch checker")?;
+//				let block_import = grandpa::light_block_import::<_, _, _, RuntimeApi, LightClient<Self>>(
+//					client.clone(), Arc::new(fetch_checker), client.clone()
+//				)?;
+//				let block_import = Arc::new(block_import);
+//				let finality_proof_import = block_import.clone();
+//				let finality_proof_request_builder = finality_proof_import.create_finality_proof_request_builder();
+//
+//				import_queue::<_, _, _, ed25519::Pair>(
+//					SlotDuration::get_or_compute(&*client)?,
+//					block_import,
+//					None,
+//					Some(finality_proof_import),
+//					Some(finality_proof_request_builder),
+//					client,
+//					NothingExtra,
+//					config.custom.inherent_data_providers.clone(),
+//				).map_err(Into::into)
+//			}},
 		SelectChain = LongestChain<FullBackend<Self>, Self::Block>
 			{ |config: &FactoryFullConfiguration<Self>, client: Arc<FullClient<Self>>| {
 				Ok(LongestChain::new(
@@ -210,8 +210,8 @@ construct_service_factory! {
 				))
 			}
 		},
-		FinalityProofProvider = { |client: Arc<FullClient<Self>>| {
-			Ok(Some(Arc::new(GrandpaFinalityProofProvider::new(client.clone(), client)) as _))
+		FinalityProofProvider = { |client: Arc<FullClient<Self>>, backend: Arc<FullBackend>| {
+			Ok(Some(Arc::new(GrandpaFinalityProofProvider::new(backend, client)) as _))
 		}},
 	}
 }

@@ -335,6 +335,7 @@ pub trait ServiceFactory: 'static + Sized {
 
 	/// Build finality proof provider for serving network requests on full node.
 	fn build_finality_proof_provider(
+		backend: Arc<FullBackend<Self>>,
 		client: Arc<FullClient<Self>>
 	) -> Result<Option<Arc<dyn FinalityProofProvider<Self::Block>>>, error::Error>;
 
@@ -413,7 +414,7 @@ pub trait Components: Sized + 'static {
 		keystore: Option<primitives::traits::BareCryptoStorePtr>,
 	) -> Result<
 		(
-			Arc<ComponentClient<Self>>,
+			(Arc<ComponentClient<Self>>, Arc<Self::Backend>),
 			Option<Arc<OnDemand<FactoryBlock<Self::Factory>>>>
 		),
 		error::Error
@@ -432,6 +433,7 @@ pub trait Components: Sized + 'static {
 
 	/// Finality proof provider for serving network requests.
 	fn build_finality_proof_provider(
+		backend: Arc<Self::Backend>,
 		client: Arc<ComponentClient<Self>>
 	) -> Result<Option<Arc<dyn FinalityProofProvider<<Self::Factory as ServiceFactory>::Block>>>, error::Error>;
 
@@ -492,7 +494,7 @@ impl<Factory: ServiceFactory> Components for FullComponents<Factory> {
 		keystore: Option<primitives::traits::BareCryptoStorePtr>,
 	)
 		-> Result<(
-			Arc<ComponentClient<Self>>,
+			(Arc<ComponentClient<Self>>, Arc<Self::Backend>),
 			Option<Arc<OnDemand<FactoryBlock<Self::Factory>>>>
 		), error::Error>
 	{
@@ -504,13 +506,14 @@ impl<Factory: ServiceFactory> Components for FullComponents<Factory> {
 			path: config.database_path.as_str().into(),
 			pruning: config.pruning.clone(),
 		};
-		Ok((Arc::new(client_db::new_client(
+		let (client, backend) = client_db::new_client(
 			db_settings,
 			executor,
 			&config.chain_spec,
 			config.execution_strategies.clone(),
 			keystore,
-		)?.0), None))
+		)?;
+		Ok(((Arc::new(client), backend), None))
 	}
 
 	fn build_transaction_pool(
@@ -538,9 +541,10 @@ impl<Factory: ServiceFactory> Components for FullComponents<Factory> {
 	}
 
 	fn build_finality_proof_provider(
+		backend: Arc<Self::Backend>,
 		client: Arc<ComponentClient<Self>>
 	) -> Result<Option<Arc<dyn FinalityProofProvider<<Self::Factory as ServiceFactory>::Block>>>, error::Error> {
-		Factory::build_finality_proof_provider(client)
+		Factory::build_finality_proof_provider(backend, client)
 	}
 }
 

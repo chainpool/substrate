@@ -64,7 +64,7 @@ pub fn light_block_import<B, E, Block: BlockT<Hash=H256>, RA, PRA>(
 		PRA::Api: GrandpaApi<Block>,
 {
 	let info = client.info()?;
-	let import_data = load_aux_import_data(info.chain.finalized_hash, &**client.backend(), api)?;
+	let import_data = load_aux_import_data(info.chain.finalized_hash, &*client, api)?;
 	Ok(GrandpaLightBlockImport {
 		client,
 		authority_set_provider,
@@ -499,7 +499,7 @@ fn require_insert_aux<T: Encode, B, E, Block: BlockT<Hash=H256>, RA>(
 		B: Backend<Block, Blake2Hasher> + 'static,
 		E: CallExecutor<Block, Blake2Hasher> + 'static + Clone + Send + Sync,
 {
-	let backend = &**client.backend();
+	let backend = &*client;
 	let encoded = value.encode();
 	let update_res = Backend::insert_aux(backend, &[(key, &encoded[..])], &[]);
 	if let Err(error) = update_res {

@@ -17,7 +17,7 @@
 /// Integrate grandpa finality with substrate service
 
 use client;
-use service::{FullBackend, FullExecutor, LightBackend, LightExecutor, ServiceFactory};
+use service::{FullBackend, FullExecutor, ServiceFactory};
 
 pub type BlockImportForService<F> = crate::GrandpaBlockImport<
 	FullBackend<F>,
@@ -41,9 +41,9 @@ pub type LinkHalfForService<F> = crate::LinkHalf<
 	<F as ServiceFactory>::SelectChain
 >;
 
-pub type BlockImportForLightService<F> = crate::light_import::GrandpaLightBlockImport<
-	LightBackend<F>,
-	LightExecutor<F>,
-	<F as ServiceFactory>::Block,
-	<F as ServiceFactory>::RuntimeApi,
->;
+//pub type BlockImportForLightService<F> = crate::light_import::GrandpaLightBlockImport<
+//	LightBackend<F>,
+//	LightExecutor<F>,
+//	<F as ServiceFactory>::Block,
+//	<F as ServiceFactory>::RuntimeApi,
+//>;

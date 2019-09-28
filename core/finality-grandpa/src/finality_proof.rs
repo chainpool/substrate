@@ -41,7 +41,7 @@ use client::{
 	backend::Backend, blockchain::Backend as BlockchainBackend, CallExecutor, Client,
 	error::{Error as ClientError, Result as ClientResult},
 	light::fetcher::{FetchChecker, RemoteCallRequest},
-	ExecutionStrategy, NeverOffchainExt,
+	ExecutionStrategy,
 };
 use parity_codec::{Encode, Decode};
 use grandpa::BlockNumberOps;
@@ -49,7 +49,7 @@ use runtime_primitives::{Justification, generic::BlockId};
 use runtime_primitives::traits::{
 	NumberFor, Block as BlockT, Header as HeaderT, One,
 };
-use substrate_primitives::{ed25519, H256, Blake2Hasher};
+use substrate_primitives::{ed25519, H256, Blake2Hasher, offchain::NeverOffchainExt};
 use ed25519::Public as AuthorityId;
 use substrate_telemetry::{telemetry, CONSENSUS_INFO};
 
@@ -130,36 +130,32 @@ impl<Block: BlockT> AuthoritySetForFinalityChecker<Block> for Arc<FetchChecker<B
 }
 
 /// Finality proof provider for serving network requests.
-pub struct FinalityProofProvider<B, E, Block: BlockT<Hash=H256>, RA> {
-	client: Arc<Client<B, E, Block, RA>>,
-	authority_provider: Arc<AuthoritySetForFinalityProver<Block>>,
+pub struct FinalityProofProvider<B, Block: BlockT<Hash=H256>> {
+	backend: Arc<B>,
+	authority_provider: Arc<dyn AuthoritySetForFinalityProver<Block>>,
 }
 
-impl<B, E, Block: BlockT<Hash=H256>, RA> FinalityProofProvider<B, E, Block, RA>
+impl<B, Block: BlockT<Hash=H256>> FinalityProofProvider<B, Block>
 	where
 		B: Backend<Block, Blake2Hasher> + Send + Sync + 'static,
-		E: CallExecutor<Block, Blake2Hasher> + 'static + Clone + Send + Sync,
-		RA: Send + Sync,
 {
 	/// Create new finality proof provider using:
 	///
 	/// - client for accessing blockchain data;
 	/// - authority_provider for calling and proving runtime methods.
 	pub fn new(
-		client: Arc<Client<B, E, Block, RA>>,
-		authority_provider: Arc<AuthoritySetForFinalityProver<Block>>,
+		backend: Arc<B>,
+		authority_provider: Arc<dyn AuthoritySetForFinalityProver<Block>>,
 	) -> Self {
-		FinalityProofProvider { client, authority_provider }
+		FinalityProofProvider { backend, authority_provider }
 	}
 }
 
-impl<B, E, Block, RA> network::FinalityProofProvider<Block> for FinalityProofProvider<B, E, Block, RA>
+impl<B, Block> network::FinalityProofProvider<Block> for FinalityProofProvider<B, Block>
 	where
 		Block: BlockT<Hash=H256>,
 		NumberFor<Block>: BlockNumberOps,
 		B: Backend<Block, Blake2Hasher> + Send + Sync + 'static,
-		E: CallExecutor<Block, Blake2Hasher> + 'static + Clone + Send + Sync,
-		RA: Send + Sync,
 {
 	fn prove_finality(
 		&self,
@@ -173,7 +169,7 @@ impl<B, E, Block, RA> network::FinalityProofProvider<Block> for FinalityProofPro
 			})?;
 		match request {
 			FinalityProofRequest::Original(request) => prove_finality::<_, _, GrandpaJustification<Block>>(
-				&*self.client.backend().blockchain(),
+				&*self.backend.blockchain(),
 				&*self.authority_provider,
 				request.authorities_set_id,
 				request.last_finalized,
@@ -267,7 +263,7 @@ pub(crate) fn prove_finality<Block: BlockT<Hash=H256>, B: BlockchainBackend<Bloc
 	let begin_number = blockchain.expect_block_number_from_id(&begin_id)?;
 
 	// early-return if we sure that there are no blocks finalized AFTER begin block
-	let info = blockchain.info()?;
+	let info = blockchain.info();
 	if info.finalized_number <= begin_number {
 		trace!(
 			target: "finality",

@@ -185,12 +185,7 @@ pub fn run_grandpa_observer<B, E, Block: BlockT<Hash=H256>, N, RA, SC>(
 			&network,
 		);
 
-		let chain_info = match client.info() {
-			Ok(i) => i,
-			Err(e) => return future::Either::B(future::err(Error::Client(e))),
-		};
-
-		let last_finalized_number = chain_info.chain.finalized_number;
+		let last_finalized_number = client.info().chain.finalized_number;
 
 		// create observer for the current set
 		let observer = grandpa_observer(
@@ -212,7 +207,7 @@ pub fn run_grandpa_observer<B, E, Block: BlockT<Hash=H256>, N, RA, SC>(
 					let completed_rounds = set_state.read().completed_rounds();
 					let set_state = VoterSetState::Paused { completed_rounds };
 
-					crate::aux_schema::write_voter_set_state(&**client.backend(), &set_state)?;
+					crate::aux_schema::write_voter_set_state(&*client, &set_state)?;
 
 					set_state
 				},
@@ -232,7 +227,7 @@ pub fn run_grandpa_observer<B, E, Block: BlockT<Hash=H256>, N, RA, SC>(
 						current_round: HasVoted::No,
 					};
 
-					crate::aux_schema::write_voter_set_state(&**client.backend(), &set_state)?;
+					crate::aux_schema::write_voter_set_state(&*client, &set_state)?;
 
 					set_state
 				},

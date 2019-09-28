@@ -91,17 +91,17 @@ mod environment;
 mod finality_proof;
 mod import;
 mod justification;
-mod light_import;
+//mod light_import;
 mod observer;
 mod until_imported;
 
 #[cfg(feature="service-integration")]
 mod service_integration;
 #[cfg(feature="service-integration")]
-pub use service_integration::{LinkHalfForService, BlockImportForService, BlockImportForLightService};
+pub use service_integration::{LinkHalfForService, BlockImportForService};
 pub use communication::Network;
 pub use finality_proof::FinalityProofProvider;
-pub use light_import::light_block_import;
+//pub use light_import::light_block_import;
 pub use observer::run_grandpa_observer;
 
 use aux_schema::PersistentData;
@@ -315,11 +315,11 @@ where
 {
 	use runtime_primitives::traits::Zero;
 
-	let chain_info = client.info()?;
+	let chain_info = client.info();
 	let genesis_hash = chain_info.chain.genesis_hash;
 
 	let persistent_data = aux_schema::load_persistent(
-		&**client.backend(),
+		&*client,
 		genesis_hash,
 		<NumberFor<Block>>::zero(),
 		|| {
@@ -428,15 +428,13 @@ fn register_finality_tracker_inherent_data_provider<B, E, Block: BlockT<Hash=H25
 	if !inherent_data_providers.has_provider(&srml_finality_tracker::INHERENT_IDENTIFIER) {
 		inherent_data_providers
 			.register_provider(srml_finality_tracker::InherentDataProvider::new(move || {
-				match client.backend().blockchain().info() {
-					Err(e) => Err(std::borrow::Cow::Owned(e.to_string())),
-					Ok(info) => {
-						telemetry!(CONSENSUS_INFO; "afg.finalized";
-							"finalized_number" => ?info.finalized_number,
-							"finalized_hash" => ?info.finalized_hash,
-						);
-						Ok(info.finalized_number)
-					},
+				{
+					let info = client.info().chain;
+					telemetry!(CONSENSUS_INFO; "afg.finalized";
+						"finalized_number" => ?info.finalized_number,
+						"finalized_hash" => ?info.finalized_hash,
+					);
+					Ok(info.finalized_number)
 				}
 			}))
 			.map_err(|err| consensus_common::ErrorKind::InherentData(err.into()).into())
@@ -465,7 +463,7 @@ pub struct GrandpaParams<'a, B, E, Block: BlockT<Hash=H256>, N, RA, SC, X> {
 /// block import worker that has already been instantiated with `block_import`.
 pub fn run_grandpa_voter<B, E, Block: BlockT<Hash=H256>, N, RA, SC, X>(
 	grandpa_params: GrandpaParams<B, E, Block, N, RA, SC, X>,
-) -> ::client::error::Result<impl Future<Item=(),Error=()> + Send + 'static> where
+) -> client::error::Result<impl Future<Item=(),Error=()> + Send + 'static> where
 	Block::Hash: Ord,
 	B: Backend<Block, Blake2Hasher> + 'static,
 	E: CallExecutor<Block, Blake2Hasher> + Send + Sync + 'static,
@@ -570,10 +568,7 @@ pub fn run_grandpa_voter<B, E, Block: BlockT<Hash=H256>, N, RA, SC, X>(
 
 		let mut maybe_voter = match &*env.voter_set_state.read() {
 			VoterSetState::Live { completed_rounds, .. } => {
-				let chain_info = match client.info() {
-					Ok(i) => i,
-					Err(e) => return future::Either::B(future::err(Error::Client(e))),
-				};
+				let chain_info = client.info();
 
 				let last_finalized = (
 					chain_info.chain.finalized_hash,
@@ -645,7 +640,7 @@ pub fn run_grandpa_voter<B, E, Block: BlockT<Hash=H256>, N, RA, SC, X>(
 						current_round: HasVoted::No,
 					};
 
-					aux_schema::write_voter_set_state(&**client.backend(), &set_state)?;
+					aux_schema::write_voter_set_state(&*client, &set_state)?;
 
 					let set_state: SharedVoterSetState<_> = set_state.into();
 
@@ -670,7 +665,7 @@ pub fn run_grandpa_voter<B, E, Block: BlockT<Hash=H256>, N, RA, SC, X>(
 					env.update_voter_set_state(|voter_set_state| {
 						let completed_rounds = voter_set_state.completed_rounds();
 						let set_state = VoterSetState::Paused { completed_rounds };
-						aux_schema::write_voter_set_state(&**client.backend(), &set_state)?;
+						aux_schema::write_voter_set_state(&*client, &set_state)?;
 						Ok(Some(set_state))
 					})?;
 
@@ -716,7 +711,8 @@ pub fn run_grandpa_voter<B, E, Block: BlockT<Hash=H256>, N, RA, SC, X>(
 
 	let voter_work = network_startup.and_then(move |()| voter_work);
 
-	Ok(voter_work.select(on_exit).then(|_| Ok(())))
+//	Ok(voter_work.select(on_exit).then(|_| Ok(())))
+	unimplemented!("not impl for run_grandpa due unknown error")
 }
 
 #[deprecated(since = "1.1", note = "Please switch to run_grandpa_voter.")]

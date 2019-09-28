@@ -97,7 +97,7 @@ pub fn new_client<Factory: components::ServiceFactory>(config: &FactoryFullConfi
 		executor,
 		None
 	)?;
-	Ok(client)
+	Ok(client.0)
 }
 
 /// Stream of events for connection established to a telemetry server.
@@ -145,14 +145,14 @@ impl<Components: components::Components> Service<Components> {
 //			}
 //		};
 
-		let (client, on_demand) = Components::build_client(&config, executor, Some(keystore.clone()))?;
+		let ((client, backend), on_demand) = Components::build_client(&config, executor, Some(keystore.clone()))?;
 		let select_chain = Components::build_select_chain(&mut config, client.clone())?;
 		let import_queue = Box::new(Components::build_import_queue(
 			&mut config,
 			client.clone(),
 			select_chain.clone(),
 		)?);
-		let finality_proof_provider = Components::build_finality_proof_provider(client.clone())?;
+		let finality_proof_provider = Components::build_finality_proof_provider(backend, client.clone())?;
 		let chain_info = client.info().chain;
 
 		let version = config.full_version();
@@ -722,9 +722,9 @@ macro_rules! construct_service_factory {
 //			}
 
 			fn build_finality_proof_provider(
-				client: Arc<$crate::FullClient<Self>>
+				backend: Arc<$crate::FullBackend>, client: Arc<$crate::FullClient<Self>>,
 			) -> Result<Option<Arc<$crate::FinalityProofProvider<Self::Block>>>, $crate::Error> {
-				( $( $finality_proof_provider_init )* ) (client)
+				( $( $finality_proof_provider_init )* ) (backend, client)
 			}
 
 //			fn new_light(

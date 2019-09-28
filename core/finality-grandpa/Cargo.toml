@@ -6,12 +6,12 @@ edition = "2018"
 
 [dependencies]
 fork-tree = { path = "../../core/util/fork-tree" }
-futures = "0.1"
+futures = "0.1.17"
 log = "0.4"
-parking_lot = "0.7.1"
+parking_lot = "0.9.0"
 tokio = "0.1.7"
 rand = "0.6"
-parity-codec = { version = "3.3", features = ["derive"] }
+parity-codec = { version = "3.5", features = ["derive"] }
 runtime_primitives = { package = "sr-primitives", path = "../sr-primitives" }
 consensus_common = { package = "substrate-consensus-common", path = "../consensus/common" }
 substrate-primitives = { path = "../primitives" }
@@ -26,11 +26,11 @@ fg_primitives = { package = "substrate-finality-grandpa-primitives", path = "pri
 grandpa = { package = "finality-grandpa", version = "0.7.2", features = ["derive-codec"] }
 
 [dev-dependencies]
-consensus_common = { package = "substrate-consensus-common", path = "../consensus/common", features = ["test-helpers"] }
-network = { package = "substrate-network", path = "../network", features = ["test-helpers"] }
-keyring = { package = "substrate-keyring", path = "../keyring" }
-test_client = { package = "substrate-test-client", path = "../test-client"}
-env_logger = "0.6"
+#consensus_common = { package = "substrate-consensus-common", path = "../consensus/common", features = ["test-helpers"] }
+#network = { package = "substrate-network", path = "../network", features = ["test-helpers"] }
+#keyring = { package = "substrate-keyring", path = "../keyring" }
+#test_client = { package = "substrate-test-client", path = "../test-client"}
+#env_logger = "0.6"
 
 [features]
 default = ["service-integration"]

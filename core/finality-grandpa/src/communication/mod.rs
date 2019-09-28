@@ -486,7 +486,7 @@ pub(crate) fn check_message_sig<Block: BlockT>(
 ) -> Result<(), ()> {
 	let as_public = AuthorityId::from_raw(id.0);
 	let encoded_raw = localized_payload(round, set_id, message);
-	if ed25519::Pair::verify(signature, &encoded_raw, as_public) {
+	if ed25519::Pair::verify(signature, &encoded_raw, &as_public) {
 		Ok(())
 	} else {
 		debug!(target: "afg", "Bad signature on message from {:?}", id);
