@@ -109,7 +109,7 @@ impl ExecutionContext {
 			// Enable keystore by default for offchain calls. CC @bkchr
 			OffchainCall(None) => [offchain::Capability::Keystore][..].into(),
 			OffchainCall(Some((_, capabilities))) => *capabilities,
-			Other => panic!("should not use `Other` for capbilities"),
+			Other => offchain::Capabilities::none(),
 		}
 	}
 }
