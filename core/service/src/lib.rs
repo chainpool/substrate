@@ -138,6 +138,16 @@ impl<Components: components::Components> Service<Components> {
 
 		let keystore = Keystore::open(config.keystore_path.clone(), config.keystore_password.clone())?;
 
+		// This is meant to be for testing only
+		// FIXME #1063 remove this
+		{
+			use primitives::traits::BareCryptoStore;
+			let mut write_keystore = keystore.write();
+			for seed in &config.keys {
+				write_keystore.ed25519_generate_new(primitives::crypto::key_types::ED25519, Some(&seed))?;
+			}
+		}
+
 		let ((client, backend), on_demand) = Components::build_client(&config, executor, Some(keystore.clone()))?;
 		let select_chain = Components::build_select_chain(&mut config, client.clone(), backend.clone())?;
 		let import_queue = Box::new(Components::build_import_queue(
