@@ -118,7 +118,7 @@ decl_module! {
 			let res = match proposal.dispatch(system::RawOrigin::Root.into()) {
 				Ok(_) => true,
 				Err(e) => {
-					sr_io::print_utf8(e.as_bytes());
+					sr_primitives::print(e);
 					false
 				}
 			};

@@ -767,6 +767,11 @@ impl traits::Extrinsic for OpaqueExtrinsic {
 	}
 }
 
+/// Print something that implements `Printable` from the runtime.
+pub fn print(print: impl traits::Printable) {
+	print.print();
+}
+
 #[cfg(test)]
 mod tests {
 	use substrate_primitives::hash::{H256, H512};

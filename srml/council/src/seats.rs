@@ -18,7 +18,6 @@
 
 use rstd::prelude::*;
 use primitives::traits::{Zero, One, As, StaticLookup};
-use runtime_io::print_utf8;
 use srml_support::{
 	StorageValue, StorageMap, dispatch::Result, decl_storage, decl_event, ensure,
 	traits::{Currency, ReservableCurrency, OnUnbalanced}
@@ -301,8 +300,8 @@ decl_module! {
 
 		fn on_finalize(n: T::BlockNumber) {
 			if let Err(e) = Self::end_block(n) {
-				print_utf8("Guru meditation".as_bytes());
-				print_utf8(e.as_bytes());
+				primitives::print("Guru meditation");
+				primitives::print(e);
 			}
 		}
 	}

@@ -155,7 +155,7 @@ decl_module! {
 
 		fn on_finalize(n: T::BlockNumber) {
 			if let Err(e) = Self::end_block(n) {
-				runtime_io::print_utf8(e.as_bytes());
+				primitives::print(e);
 			}
 		}
 

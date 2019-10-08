@@ -704,7 +704,7 @@ define_env!(Env, <E: Ext>,
 	ext_println(ctx, str_ptr: u32, str_len: u32) => {
 		let data = read_sandbox_memory(ctx, str_ptr, str_len)?;
 		if let Ok(utf8) = core::str::from_utf8(&data) {
-			runtime_io::print_utf8(utf8.as_bytes());
+			runtime_primitives::print(utf8);
 		}
 		Ok(())
 	},
