@@ -696,6 +696,28 @@ impl_wasm_host_interface! {
 
 		ext_storage_changes_root(
 			parent_hash_data: Pointer<u8>,
+			parent_hash_len: WordSize,
+			parent_number: u64,
+			result: Pointer<u8>,
+		) -> u32 {
+			let mut parent_hash = [0u8; 32];
+			context.read_memory_into(parent_hash_data, &mut parent_hash[..])
+				.map_err(|_| "Invalid attempt to get parent_hash in ext_storage_changes_root")?;
+			let r = with_external_storage(move ||
+				Ok(runtime_io::storage_changes_root(parent_hash, parent_number))
+			)?;
+
+			if let Some(r) = r {
+				context.write_memory(result, &r[..])
+					.map_err(|_| "Invalid attempt to set memory in ext_storage_changes_root")?;
+				Ok(1)
+			} else {
+				Ok(0)
+			}
+		}
+
+		ext_storage_changes_root2(
+			parent_hash_data: Pointer<u8>,
 			_len: WordSize,
 			result: Pointer<u8>,
 		) -> u32 {
@@ -703,7 +725,7 @@ impl_wasm_host_interface! {
 			context.read_memory_into(parent_hash_data, &mut parent_hash[..])
 				.map_err(|_| "Invalid attempt to get parent_hash in ext_storage_changes_root")?;
 			let r = with_external_storage(move ||
-				Ok(runtime_io::storage_changes_root(parent_hash))
+				Ok(runtime_io::storage_changes_root2(parent_hash))
 			)?;
 
 			if let Some(r) = r {

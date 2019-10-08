@@ -216,7 +216,14 @@ pub mod ext {
 		///
 		/// - `1` if the change trie root was found.
 		/// - `0` if the change trie root was not found.
-		fn ext_storage_changes_root(
+		fn ext_storage_changes_root(parent_hash_data: *const u8, parent_hash_len: u32, parent_num: u64, result: *mut u8) -> u32;
+		/// Get the change trie root of the current storage overlay at a block with given parent.
+		///
+		/// # Returns
+		///
+		/// - `1` if the change trie root was found.
+		/// - `0` if the change trie root was not found.
+		fn ext_storage_changes_root2(
 			parent_hash_data: *const u8,
 			parent_hash_len: u32,
 			result: *mut u8,
@@ -718,10 +725,14 @@ impl StorageApi for () {
 		}
 	}
 
-	fn storage_changes_root(parent_hash: [u8; 32]) -> Option<[u8; 32]> {
+	fn storage_changes_root(parent_hash: [u8; 32], _parent_num: u64) -> Option<[u8; 32]> {
+		Self::storage_changes_root2(parent_hash)
+	}
+
+	fn storage_changes_root2(parent_hash: [u8; 32]) -> Option<[u8; 32]> {
 		let mut result: [u8; 32] = Default::default();
 		let is_set = unsafe {
-			ext_storage_changes_root.get()(parent_hash.as_ptr(), parent_hash.len() as u32, result.as_mut_ptr())
+			ext_storage_changes_root2.get()(parent_hash.as_ptr(), parent_hash.len() as u32, result.as_mut_ptr())
 		};
 
 		if is_set != 0 {
@@ -731,9 +742,22 @@ impl StorageApi for () {
 		}
 	}
 
+	fn enumerated_trie_root(values: &[&[u8]]) -> H256 {
+		// same as `blake2_256_ordered_trie_root`
+		let input: Vec<Vec<u8>> = values.into_iter().map(|v| (*v).to_vec()).collect::<Vec<_>>();
+		Self::blake2_256_ordered_trie_root(input)
+	}
+
+	fn trie_root(_input: Vec<(Vec<u8>, Vec<u8>)>) -> H256 {
+		unimplemented!()
+	}
 
 	fn blake2_256_trie_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> H256 {
 		unimplemented!()
+	}
+
+	fn ordered_trie_root(input: Vec<Vec<u8>>) -> H256 {
+		Self::blake2_256_ordered_trie_root(input)
 	}
 
 	fn blake2_256_ordered_trie_root(input: Vec<Vec<u8>>) -> H256 {

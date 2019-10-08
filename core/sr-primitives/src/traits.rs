@@ -494,6 +494,9 @@ pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {
 		Encode::using_encoded(s, Self::hash)
 	}
 
+	/// Produce the trie-db root of a mapping from indices to byte slices.
+	fn enumerated_trie_root(items: &[&[u8]]) -> Self::Output;
+
 	/// The ordered Patricia tree root of the given `input`.
 	fn ordered_trie_root(input: Vec<Vec<u8>>) -> Self::Output;
 
@@ -504,7 +507,10 @@ pub trait Hash: 'static + MaybeSerializeDebug + Clone + Eq + PartialEq {
 	fn storage_root() -> Self::Output;
 
 	/// Acquire the global storage changes root.
-	fn storage_changes_root(parent_hash: Self::Output) -> Option<Self::Output>;
+	fn storage_changes_root(parent_hash: Self::Output, parent_number: u64) -> Option<Self::Output>;
+
+	/// Acquire the global storage changes root.
+	fn storage_changes_root2(parent_hash: Self::Output) -> Option<Self::Output>;
 }
 
 /// Blake2-256 Hash implementation.
@@ -518,7 +524,9 @@ impl Hash for BlakeTwo256 {
 	fn hash(s: &[u8]) -> Self::Output {
 		runtime_io::blake2_256(s).into()
 	}
-
+	fn enumerated_trie_root(items: &[&[u8]]) -> Self::Output {
+		runtime_io::enumerated_trie_root(items).into()
+	}
 	fn trie_root(input: Vec<(Vec<u8>, Vec<u8>)>) -> Self::Output {
 		runtime_io::blake2_256_trie_root(input)
 	}
@@ -530,9 +538,11 @@ impl Hash for BlakeTwo256 {
 	fn storage_root() -> Self::Output {
 		runtime_io::storage_root().into()
 	}
-
-	fn storage_changes_root(parent_hash: Self::Output) -> Option<Self::Output> {
-		runtime_io::storage_changes_root(parent_hash.into()).map(Into::into)
+	fn storage_changes_root(parent_hash: Self::Output, parent_number: u64) -> Option<Self::Output> {
+		runtime_io::storage_changes_root(parent_hash.into(), parent_number).map(Into::into)
+	}
+	fn storage_changes_root2(parent_hash: Self::Output) -> Option<Self::Output> {
+		runtime_io::storage_changes_root2(parent_hash.into()).map(Into::into)
 	}
 }
 
