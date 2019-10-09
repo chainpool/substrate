@@ -31,7 +31,7 @@ use consensus_common::{self, evaluation};
 use primitives::{H256, Blake2Hasher, ExecutionContext};
 use runtime_primitives::traits::{
 	Block as BlockT, Hash as HashT, Header as HeaderT, ProvideRuntimeApi,
-	AuthorityIdFor, DigestFor,
+	AuthorityIdFor,
 };
 use runtime_primitives::generic::BlockId;
 use runtime_primitives::ApplyError;
@@ -55,12 +55,10 @@ pub trait AuthoringApi: Send + Sync + ProvideRuntimeApi where
 	type Error: std::error::Error;
 
 	/// Build a block on top of the given block, with inherent extrinsics and
-	/// inherent digests pre-pushed.
 	fn build_block<F: FnMut(&mut dyn BlockBuilder<Self::Block>) -> ()>(
 		&self,
 		at: &BlockId<Self::Block>,
 		inherent_data: InherentData,
-		inherent_digests: DigestFor<Self::Block>,
 		build_ctx: F,
 	) -> Result<Self::Block, error::Error>;
 }
@@ -95,11 +93,10 @@ impl<B, E, Block, RA> AuthoringApi for SubstrateClient<B, E, Block, RA> where
 		&self,
 		at: &BlockId<Self::Block>,
 		inherent_data: InherentData,
-		inherent_digests: DigestFor<Self::Block>,
 		mut build_ctx: F,
 	) -> Result<Self::Block, error::Error> {
 
-		let mut block_builder = self.new_block_at(at, inherent_digests)?;
+		let mut block_builder = self.new_block_at(at)?;
 
 		let runtime_api = self.runtime_api();
 		// We don't check the API versions any further here since the dispatch compatibility
@@ -178,13 +175,12 @@ impl<Block, C, A> consensus_common::Proposer<<C as AuthoringApi>::Block> for Pro
 	fn propose(
 		&self,
 		inherent_data: InherentData,
-		inherent_digests: DigestFor<Block>,
 		max_duration: time::Duration,
 	) -> Result<<C as AuthoringApi>::Block, error::Error>
 	{
 		// leave some time for evaluation and block finalization (33%)
 		let deadline = (self.now)() + max_duration - max_duration / 3;
-		self.propose_with(inherent_data, inherent_digests, deadline)
+		self.propose_with(inherent_data, deadline)
 	}
 }
 
@@ -198,7 +194,6 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 	fn propose_with(
 		&self,
 		inherent_data: InherentData,
-		inherent_digests: DigestFor<Block>,
 		deadline: time::Instant,
 	) -> Result<<C as AuthoringApi>::Block, error::Error>
 	{
@@ -212,7 +207,6 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 		let block = self.client.build_block(
 			&self.parent_id,
 			inherent_data,
-			inherent_digests.clone(),
 			|block_builder| {
 				// proceed with transactions
 				let mut is_first = true;

@@ -20,7 +20,7 @@ use parity_codec::Encode;
 use runtime_primitives::ApplyOutcome;
 use runtime_primitives::generic::BlockId;
 use runtime_primitives::traits::{
-	Header as HeaderT, Hash, Block as BlockT, One, HashFor, ProvideRuntimeApi, ApiRef, DigestFor,
+	Header as HeaderT, Hash, Block as BlockT, One, HashFor, ProvideRuntimeApi, ApiRef,
 };
 use primitives::{H256, ExecutionContext};
 use crate::blockchain::HeaderBackend;
@@ -43,8 +43,8 @@ where
 {
 	/// Create a new instance of builder from the given client, building on the
 	/// latest block.
-	pub fn new(api: &'a A, inherent_digests: DigestFor<Block>) -> error::Result<Self> {
-		Self::at_block(&BlockId::Hash(api.info().best_hash), api, false, inherent_digests)
+	pub fn new(api: &'a A) -> error::Result<Self> {
+		Self::at_block(&BlockId::Hash(api.info().best_hash), api, false)
 	}
 
 	/// Create a new instance of builder from the given client using a
@@ -57,7 +57,6 @@ where
 		block_id: &BlockId<Block>,
 		api: &'a A,
 		proof_recording: bool,
-		inherent_digests: DigestFor<Block>,
 	) -> error::Result<Self> {
 		let number = api.block_number_from_id(block_id)?
 			.ok_or_else(|| error::Error::UnknownBlock(format!("{}", block_id)))?
@@ -70,7 +69,7 @@ where
 			Default::default(),
 			Default::default(),
 			parent_hash,
-			inherent_digests,
+			Default::default(),
 		);
 
 		let mut api = api.runtime_api();

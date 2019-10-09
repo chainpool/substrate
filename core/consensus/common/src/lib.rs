@@ -33,7 +33,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use runtime_primitives::generic::BlockId;
-use runtime_primitives::traits::{AuthorityIdFor, Block, DigestFor};
+use runtime_primitives::traits::{AuthorityIdFor, Block};
 use futures::prelude::*;
 pub use inherents::InherentData;
 
@@ -90,7 +90,6 @@ pub trait Proposer<B: Block> {
 	fn propose(
 		&self,
 		inherent_data: InherentData,
-		inherent_digests: DigestFor<B>,
 		max_duration: Duration,
 	) -> Self::Create;
 }

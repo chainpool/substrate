@@ -80,7 +80,7 @@ use rstd::result;
 use primitives::traits::{
 	self, Header, Zero, One, Checkable, Applyable, CheckEqual, OnFinalize,
 	OnInitialize, Digest, NumberFor, Block as BlockT, OffchainWorker,
-	ValidateUnsigned, DigestItem,
+	ValidateUnsigned,
 };
 use primitives::weights::Weighable;
 use primitives::{ApplyOutcome, ApplyError};
@@ -157,18 +157,15 @@ where
 {
 	/// Start the execution of a particular block.
 	pub fn initialize_block(header: &System::Header) {
-		let mut digests = System::Digest::default();
-		header.digest().logs().iter().for_each(|d| if d.as_pre_runtime().is_some() { digests.push(d.clone()) });
-		Self::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root(), &digests);
+		Self::initialize_block_impl(header.number(), header.parent_hash(), header.extrinsics_root());
 	}
 
 	fn initialize_block_impl(
 		block_number: &System::BlockNumber,
 		parent_hash: &System::Hash,
 		extrinsics_root: &System::Hash,
-		digest: &System::Digest
 	) {
-		<system::Module<System>>::initialize(block_number, parent_hash, extrinsics_root, digest);
+		<system::Module<System>>::initialize(block_number, parent_hash, extrinsics_root);
 		<AllModules as OnInitialize<System::BlockNumber>>::on_initialize(*block_number);
 	}
 
