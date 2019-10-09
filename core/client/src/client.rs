@@ -37,7 +37,7 @@ use consensus::{
 use runtime_primitives::traits::{
 	Block as BlockT, Header as HeaderT, Zero, NumberFor, CurrentHeight,
 	BlockNumberToHash, ApiRef, ProvideRuntimeApi, Digest, DigestItem,
-	SaturatedConversion, One, DigestFor,
+	SaturatedConversion, One,
 };
 use runtime_primitives::BuildStorage;
 use crate::runtime_api::{
@@ -715,28 +715,26 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 	/// Create a new block, built on the head of the chain.
 	pub fn new_block(
 		&self,
-		inherent_digests: DigestFor<Block>,
 	) -> error::Result<block_builder::BlockBuilder<Block, Self>> where
 		E: Clone + Send + Sync,
 		RA: Send + Sync,
 		Self: ProvideRuntimeApi,
 		<Self as ProvideRuntimeApi>::Api: BlockBuilderAPI<Block>
 	{
-		block_builder::BlockBuilder::new(self, inherent_digests)
+		block_builder::BlockBuilder::new(self)
 	}
 
 	/// Create a new block, built on top of `parent`.
 	pub fn new_block_at(
 		&self,
 		parent: &BlockId<Block>,
-		inherent_digests: DigestFor<Block>,
 	) -> error::Result<block_builder::BlockBuilder<Block, Self>> where
 		E: Clone + Send + Sync,
 		RA: Send + Sync,
 		Self: ProvideRuntimeApi,
 		<Self as ProvideRuntimeApi>::Api: BlockBuilderAPI<Block>
 	{
-		block_builder::BlockBuilder::at_block(parent, &self, false, inherent_digests)
+		block_builder::BlockBuilder::at_block(parent, &self, false)
 	}
 
 	/// Create a new block, built on top of `parent` with proof recording enabled.
@@ -747,14 +745,13 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 	pub fn new_block_at_with_proof_recording(
 		&self,
 		parent: &BlockId<Block>,
-		inherent_digests: DigestFor<Block>,
 	) -> error::Result<block_builder::BlockBuilder<Block, Self>> where
 		E: Clone + Send + Sync,
 		RA: Send + Sync,
 		Self: ProvideRuntimeApi,
 		<Self as ProvideRuntimeApi>::Api: BlockBuilderAPI<Block>
 	{
-		block_builder::BlockBuilder::at_block(parent, &self, true, inherent_digests)
+		block_builder::BlockBuilder::at_block(parent, &self, true)
 	}
 
 	/// Lock the import lock, and run operations inside.
@@ -1791,7 +1788,7 @@ pub(crate) mod tests {
 		let remote_client = TestClientBuilder::new().set_support_changes_trie(true).build();
 		let mut nonces: HashMap<_, u64> = Default::default();
 		for (i, block_transfers) in blocks_transfers.into_iter().enumerate() {
-			let mut builder = remote_client.new_block(Default::default()).unwrap();
+			let mut builder = remote_client.new_block().unwrap();
 			for (from, to) in block_transfers {
 				builder.push_transfer(Transfer {
 					from: from.into(),
@@ -1866,7 +1863,7 @@ pub(crate) mod tests {
 	fn block_builder_works_with_no_transactions() {
 		let client = test_client::new();
 
-		let builder = client.new_block(Default::default()).unwrap();
+		let builder = client.new_block().unwrap();
 
 		client.import(BlockOrigin::Own, builder.bake().unwrap()).unwrap();
 
@@ -1877,7 +1874,7 @@ pub(crate) mod tests {
 	fn block_builder_works_with_transactions() {
 		let client = test_client::new();
 
-		let mut builder = client.new_block(Default::default()).unwrap();
+		let mut builder = client.new_block().unwrap();
 
 		builder.push_transfer(Transfer {
 			from: AccountKeyring::Alice.into(),
@@ -1913,7 +1910,7 @@ pub(crate) mod tests {
 	fn block_builder_does_not_include_invalid() {
 		let client = test_client::new();
 
-		let mut builder = client.new_block(Default::default()).unwrap();
+		let mut builder = client.new_block().unwrap();
 
 		builder.push_transfer(Transfer {
 			from: AccountKeyring::Alice.into(),
@@ -1961,7 +1958,7 @@ pub(crate) mod tests {
 
 		let (client, longest_chain_select) = TestClientBuilder::new().build_with_longest_chain();
 
-		let uninserted_block = client.new_block(Default::default()).unwrap().bake().unwrap();
+		let uninserted_block = client.new_block().unwrap().bake().unwrap();
 
 		assert_eq!(
 			None,
@@ -1976,11 +1973,11 @@ pub(crate) mod tests {
 		let client = test_client::new();
 
 		// G -> A1
-		let a1 = client.new_block(Default::default()).unwrap().bake().unwrap();
+		let a1 = client.new_block().unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a1.clone()).unwrap();
 
 		// A1 -> A2
-		let a2 = client.new_block(Default::default()).unwrap().bake().unwrap();
+		let a2 = client.new_block().unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a2.clone()).unwrap();
 		let v: Vec<H256> = Vec::new();
 		assert_eq!(v, client.uncles(a2.hash(), 3).unwrap());
@@ -1996,27 +1993,27 @@ pub(crate) mod tests {
 		let client = test_client::new();
 
 		// G -> A1
-		let a1 = client.new_block(Default::default()).unwrap().bake().unwrap();
+		let a1 = client.new_block().unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a1.clone()).unwrap();
 
 		// A1 -> A2
-		let a2 = client.new_block_at(&BlockId::Hash(a1.hash()), Default::default()).unwrap().bake().unwrap();
+		let a2 = client.new_block_at(&BlockId::Hash(a1.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a2.clone()).unwrap();
 
 		// A2 -> A3
-		let a3 = client.new_block_at(&BlockId::Hash(a2.hash()), Default::default()).unwrap().bake().unwrap();
+		let a3 = client.new_block_at(&BlockId::Hash(a2.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a3.clone()).unwrap();
 
 		// A3 -> A4
-		let a4 = client.new_block_at(&BlockId::Hash(a3.hash()), Default::default()).unwrap().bake().unwrap();
+		let a4 = client.new_block_at(&BlockId::Hash(a3.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a4.clone()).unwrap();
 
 		// A4 -> A5
-		let a5 = client.new_block_at(&BlockId::Hash(a4.hash()), Default::default()).unwrap().bake().unwrap();
+		let a5 = client.new_block_at(&BlockId::Hash(a4.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a5.clone()).unwrap();
 
 		// A1 -> B2
-		let mut builder = client.new_block_at(&BlockId::Hash(a1.hash()), Default::default()).unwrap();
+		let mut builder = client.new_block_at(&BlockId::Hash(a1.hash())).unwrap();
 		// this push is required as otherwise B2 has the same hash as A2 and won't get imported
 		builder.push_transfer(Transfer {
 			from: AccountKeyring::Alice.into(),
@@ -2028,15 +2025,15 @@ pub(crate) mod tests {
 		client.import(BlockOrigin::Own, b2.clone()).unwrap();
 
 		// B2 -> B3
-		let b3 = client.new_block_at(&BlockId::Hash(b2.hash()), Default::default()).unwrap().bake().unwrap();
+		let b3 = client.new_block_at(&BlockId::Hash(b2.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, b3.clone()).unwrap();
 
 		// B3 -> B4
-		let b4 = client.new_block_at(&BlockId::Hash(b3.hash()), Default::default()).unwrap().bake().unwrap();
+		let b4 = client.new_block_at(&BlockId::Hash(b3.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, b4.clone()).unwrap();
 
 		// // B2 -> C3
-		let mut builder = client.new_block_at(&BlockId::Hash(b2.hash()), Default::default()).unwrap();
+		let mut builder = client.new_block_at(&BlockId::Hash(b2.hash())).unwrap();
 		// this push is required as otherwise C3 has the same hash as B3 and won't get imported
 		builder.push_transfer(Transfer {
 			from: AccountKeyring::Alice.into(),
@@ -2048,7 +2045,7 @@ pub(crate) mod tests {
 		client.import(BlockOrigin::Own, c3.clone()).unwrap();
 
 		// A1 -> D2
-		let mut builder = client.new_block_at(&BlockId::Hash(a1.hash()), Default::default()).unwrap();
+		let mut builder = client.new_block_at(&BlockId::Hash(a1.hash())).unwrap();
 		// this push is required as otherwise D2 has the same hash as B2 and won't get imported
 		builder.push_transfer(Transfer {
 			from: AccountKeyring::Alice.into(),
@@ -2112,27 +2109,27 @@ pub(crate) mod tests {
 		let (client, longest_chain_select) = TestClientBuilder::new().build_with_longest_chain();
 
 		// G -> A1
-		let a1 = client.new_block(Default::default()).unwrap().bake().unwrap();
+		let a1 = client.new_block().unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a1.clone()).unwrap();
 
 		// A1 -> A2
-		let a2 = client.new_block_at(&BlockId::Hash(a1.hash()), Default::default()).unwrap().bake().unwrap();
+		let a2 = client.new_block_at(&BlockId::Hash(a1.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a2.clone()).unwrap();
 
 		// A2 -> A3
-		let a3 = client.new_block_at(&BlockId::Hash(a2.hash()), Default::default()).unwrap().bake().unwrap();
+		let a3 = client.new_block_at(&BlockId::Hash(a2.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a3.clone()).unwrap();
 
 		// A3 -> A4
-		let a4 = client.new_block_at(&BlockId::Hash(a3.hash()), Default::default()).unwrap().bake().unwrap();
+		let a4 = client.new_block_at(&BlockId::Hash(a3.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a4.clone()).unwrap();
 
 		// A4 -> A5
-		let a5 = client.new_block_at(&BlockId::Hash(a4.hash()), Default::default()).unwrap().bake().unwrap();
+		let a5 = client.new_block_at(&BlockId::Hash(a4.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a5.clone()).unwrap();
 
 		// A1 -> B2
-		let mut builder = client.new_block_at(&BlockId::Hash(a1.hash()), Default::default()).unwrap();
+		let mut builder = client.new_block_at(&BlockId::Hash(a1.hash())).unwrap();
 		// this push is required as otherwise B2 has the same hash as A2 and won't get imported
 		builder.push_transfer(Transfer {
 			from: AccountKeyring::Alice.into(),
@@ -2144,15 +2141,15 @@ pub(crate) mod tests {
 		client.import(BlockOrigin::Own, b2.clone()).unwrap();
 
 		// B2 -> B3
-		let b3 = client.new_block_at(&BlockId::Hash(b2.hash()), Default::default()).unwrap().bake().unwrap();
+		let b3 = client.new_block_at(&BlockId::Hash(b2.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, b3.clone()).unwrap();
 
 		// B3 -> B4
-		let b4 = client.new_block_at(&BlockId::Hash(b3.hash()), Default::default()).unwrap().bake().unwrap();
+		let b4 = client.new_block_at(&BlockId::Hash(b3.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, b4.clone()).unwrap();
 
 		// // B2 -> C3
-		let mut builder = client.new_block_at(&BlockId::Hash(b2.hash()), Default::default()).unwrap();
+		let mut builder = client.new_block_at(&BlockId::Hash(b2.hash())).unwrap();
 		// this push is required as otherwise C3 has the same hash as B3 and won't get imported
 		builder.push_transfer(Transfer {
 			from: AccountKeyring::Alice.into(),
@@ -2164,7 +2161,7 @@ pub(crate) mod tests {
 		client.import(BlockOrigin::Own, c3.clone()).unwrap();
 
 		// A1 -> D2
-		let mut builder = client.new_block_at(&BlockId::Hash(a1.hash()), Default::default()).unwrap();
+		let mut builder = client.new_block_at(&BlockId::Hash(a1.hash())).unwrap();
 		// this push is required as otherwise D2 has the same hash as B2 and won't get imported
 		builder.push_transfer(Transfer {
 			from: AccountKeyring::Alice.into(),
@@ -2430,16 +2427,16 @@ pub(crate) mod tests {
 		let client = test_client::new();
 
 		// G -> A1
-		let a1 = client.new_block(Default::default()).unwrap().bake().unwrap();
+		let a1 = client.new_block().unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a1.clone()).unwrap();
 
 		// A1 -> A2
-		let a2 = client.new_block_at(&BlockId::Hash(a1.hash()), Default::default()).unwrap().bake().unwrap();
+		let a2 = client.new_block_at(&BlockId::Hash(a1.hash())).unwrap().bake().unwrap();
 		client.import(BlockOrigin::Own, a2.clone()).unwrap();
 
 		// A2 -> A3
 		let justification = vec![1, 2, 3];
-		let a3 = client.new_block_at(&BlockId::Hash(a2.hash()), Default::default()).unwrap().bake().unwrap();
+		let a3 = client.new_block_at(&BlockId::Hash(a2.hash())).unwrap().bake().unwrap();
 		client.import_justified(BlockOrigin::Own, a3.clone(), justification.clone()).unwrap();
 
 		#[allow(deprecated)]

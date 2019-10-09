@@ -44,7 +44,7 @@ use client::{
 	error::Result as CResult,
 	backend::AuxStore,
 };
-
+use aura_primitives::AURA_ENGINE_ID;
 use runtime_primitives::{generic::{self, BlockId}, Justification};
 use runtime_primitives::traits::{
 	Block, Header, Digest, DigestItemFor, DigestItem, ProvideRuntimeApi, AuthorityIdFor,
@@ -57,7 +57,7 @@ use authorities::AuthoritiesApi;
 
 use futures::{Future, IntoFuture, future};
 use tokio_timer::Timeout;
-use log::{error, warn, debug, info, trace};
+use log::{warn, debug, info, trace};
 
 use srml_aura::{
 	InherentType as AuraInherent, AuraInherentData,
@@ -69,11 +69,9 @@ use slots::{CheckedHeader, SlotData, SlotWorker, SlotInfo, SlotCompatible, slot_
 
 pub use aura_primitives::*;
 pub use consensus_common::SyncOracle;
-pub use digest::CompatibleDigestItem;
-
-mod digest;
 
 type AuthorityId<P> = <P as Pair>::Public;
+type Signature<P> = <P as Pair>::Signature;
 
 /// A slot duration. Create with `get_or_compute`.
 #[derive(Clone, Copy, Debug, Encode, Decode, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -108,6 +106,48 @@ fn slot_author<P: Pair>(slot_num: u64, authorities: &[AuthorityId<P>]) -> Option
 				this is a valid index; qed");
 
 	Some(current_author)
+}
+
+/// A digest item which is usable with aura consensus.
+pub trait CompatibleDigestItem<T: Pair>: Sized {
+	/// Construct a digest item which contains a slot number and a signature on the
+	/// hash.
+	fn aura_seal(slot_num: u64, signature: Signature<T>) -> Self;
+
+	/// If this item is an Aura seal, return the slot number and signature.
+	fn as_aura_seal(&self) -> Option<(u64, Signature<T>)>;
+
+	/// Return `true` if this seal type is deprecated.  Otherwise, return
+	/// `false`.
+	fn is_deprecated(&self) -> bool;
+}
+
+impl<P, Hash> CompatibleDigestItem<P> for generic::DigestItem<Hash, P::Public, P::Signature>
+	where P: Pair, P::Signature: Clone + Encode + Decode,
+{
+	/// Construct a digest item which is a slot number and a signature on the
+	/// hash.
+	fn aura_seal(slot_number: u64, signature: Signature<P>) -> Self {
+		generic::DigestItem::Consensus(AURA_ENGINE_ID, (slot_number, signature).encode())
+	}
+
+	/// If this item is an Aura seal, return the slot number and signature.
+	#[allow(deprecated)]
+	fn as_aura_seal(&self) -> Option<(u64, Signature<P>)> {
+		match self {
+			generic::DigestItem::Seal(slot, ref sig) => Some((*slot, (*sig).clone())),
+			generic::DigestItem::Consensus(AURA_ENGINE_ID, seal) => Decode::decode(&mut &seal[..]),
+			_ => None,
+		}
+	}
+
+	#[allow(deprecated)]
+	fn is_deprecated(&self) -> bool {
+		match self {
+			generic::DigestItem::Seal(_, _) => true,
+			_ => false,
+		}
+	}
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -274,11 +314,6 @@ impl<H, B, C, E, I, P, Error, SO> SlotWorker<B> for AuraWorker<C, E, I, P, SO> w
 				Timeout::new(
 					proposer.propose(
 						slot_info.inherent_data,
-						generic::Digest {
-							logs: vec![
-								<DigestItemFor<B> as CompatibleDigestItem<P>>::aura_pre_digest(slot_num),
-							],
-						},
 						remaining_duration,
 					).into_future(),
 					remaining_duration,
@@ -304,28 +339,24 @@ impl<H, B, C, E, I, P, Error, SO> SlotWorker<B> for AuraWorker<C, E, I, P, SO> w
 			}
 
 			let (header, body) = b.deconstruct();
-			let pre_digest: Result<u64, String> = find_pre_digest::<B, P>(&header);
-			if let Err(e) = pre_digest {
-				error!(target: "aura", "FATAL ERROR: Invalid pre-digest: {}!", e);
-				return
-			} else {
-				trace!(target: "aura", "Got correct number of seals.  Good!")
-			};
-
 			let header_num = header.number().clone();
+			let pre_hash = header.hash();
 			let parent_hash = header.parent_hash().clone();
 
 			// sign the pre-sealed hash of the block and then
 			// add it to a digest item.
-			let header_hash = header.hash();
-			let signature = pair.sign(header_hash.as_ref());
-			let signature_digest_item = <DigestItemFor<B> as CompatibleDigestItem<P>>::aura_seal(signature);
+			let to_sign = (slot_num, pre_hash).encode();
+			let signature = pair.sign(&to_sign[..]);
+			let item = <DigestItemFor<B> as CompatibleDigestItem<P>>::aura_seal(
+				slot_num,
+				signature,
+			);
 
 			let import_block: ImportBlock<B> = ImportBlock {
 				origin: BlockOrigin::Own,
 				header,
 				justification: None,
-				post_digests: vec![signature_digest_item],
+				post_digests: vec![item],
 				body: Some(body),
 				finalized: false,
 				auxiliary: Vec::new(),
@@ -333,19 +364,19 @@ impl<H, B, C, E, I, P, Error, SO> SlotWorker<B> for AuraWorker<C, E, I, P, SO> w
 			};
 
 			info!("Pre-sealed block for proposal at {}. Hash now {:?}, previously {:?}.",
-					header_num,
-					import_block.post_header().hash(),
-					header_hash
+				header_num,
+				import_block.post_header().hash(),
+				pre_hash
 			);
 			telemetry!(CONSENSUS_INFO; "aura.pre_sealed_block";
 				"header_num" => ?header_num,
 				"hash_now" => ?import_block.post_header().hash(),
-				"hash_previously" => ?header_hash
+				"hash_previously" => ?pre_hash
 			);
 
 			if let Err(e) = block_import.import_block(import_block, Default::default()) {
 				warn!(target: "aura", "Error with block built on {:?}: {:?}",
-						parent_hash, e);
+					parent_hash, e);
 				telemetry!(CONSENSUS_WARN; "aura.err_with_block_built_on";
 					"hash" => ?parent_hash, "err" => ?e
 				);
@@ -361,23 +392,23 @@ macro_rules! aura_err {
 		}
 	};
 }
-
-fn find_pre_digest<B: Block, P: Pair>(header: &B::Header) -> Result<u64, String>
-	where DigestItemFor<B>: CompatibleDigestItem<P>,
-		P::Signature: Decode,
-		P::Public: Encode + Decode + PartialEq + Clone,
-{
-	let mut pre_digest: Option<u64> = None;
-	for log in header.digest().logs() {
-		trace!(target: "aura", "Checking log {:?}", log);
-		match (log.as_aura_pre_digest(), pre_digest.is_some()) {
-			(Some(_), true) => Err(aura_err!("Multiple AuRa pre-runtime headers, rejecting!"))?,
-			(None, _) => trace!(target: "aura", "Ignoring digest not meant for us"),
-			(s, false) => pre_digest = s,
-		}
-	}
-	pre_digest.ok_or_else(|| aura_err!("No AuRa pre-runtime digest found"))
-}
+//
+//fn find_pre_digest<B: Block, P: Pair>(header: &B::Header) -> Result<u64, String>
+//	where DigestItemFor<B>: CompatibleDigestItem<P>,
+//		P::Signature: Decode,
+//		P::Public: Encode + Decode + PartialEq + Clone,
+//{
+//	let mut pre_digest: Option<u64> = None;
+//	for log in header.digest().logs() {
+//		trace!(target: "aura", "Checking log {:?}", log);
+//		match (log.as_aura_pre_digest(), pre_digest.is_some()) {
+//			(Some(_), true) => Err(aura_err!("Multiple AuRa pre-runtime headers, rejecting!"))?,
+//			(None, _) => trace!(target: "aura", "Ignoring digest not meant for us"),
+//			(s, false) => pre_digest = s,
+//		}
+//	}
+//	pre_digest.ok_or_else(|| aura_err!("No AuRa pre-runtime digest found"))
+//}
 
 
 /// check a header has been signed by the right key. If the slot is too far in the future, an error will be returned.
@@ -392,55 +423,62 @@ fn check_header<C, B: Block, P: Pair>(
 	mut header: B::Header,
 	hash: B::Hash,
 	authorities: &[AuthorityId<P>],
-) -> Result<CheckedHeader<B::Header, (u64, DigestItemFor<B>)>, String> where
-	DigestItemFor<B>: CompatibleDigestItem<P>,
-	P::Signature: Decode,
-	C: client::backend::AuxStore,
-	P::Public: AsRef<P::Public> + Encode + Decode + PartialEq + Clone,
+) -> Result<CheckedHeader<B::Header, DigestItemFor<B>>, String>
+	where DigestItemFor<B>: CompatibleDigestItem<P>,
+		P::Signature: Decode,
+		C: client::backend::AuxStore,
+		P::Public: AsRef<P::Public> + Encode + Decode + PartialEq + Clone,
 {
-	let seal = match header.digest_mut().pop() {
+	let digest_item = match header.digest_mut().pop() {
 		Some(x) => x,
-		None => return Err(format!("Header {:?} is unsealed", hash)),
+		None => return Err(aura_err!("Header {:?} is unsealed", hash)),
 	};
 
-	let sig = seal.as_aura_seal().ok_or_else(|| {
-		aura_err!("Header {:?} has a bad seal", hash)
+	if digest_item.is_deprecated() {
+		return Err(aura_err!("Header {:?} uses old seal format, rejecting", hash))
+	}
+
+	let (slot_num, sig) = digest_item.as_aura_seal().ok_or_else(|| {
+		aura_err!("Header {:?} is unsealed", hash)
 	})?;
 
-	let slot_num = find_pre_digest::<B, _>(&header)?;
-
 	if slot_num > slot_now {
-		header.digest_mut().push(seal);
+		header.digest_mut().push(digest_item);
 		Ok(CheckedHeader::Deferred(header, slot_num))
 	} else {
 		// check the signature is valid under the expected authority and
 		// chain state.
 		let expected_author = match slot_author::<P>(slot_num, &authorities) {
-			None => return Err("Slot Author not found".to_string()),
+			None => return Err(aura_err!("Slot Author not found")),
 			Some(author) => author,
 		};
 
 		let pre_hash = header.hash();
+		let to_sign = (slot_num, pre_hash).encode();
 
-		if P::verify(&sig, pre_hash.as_ref(), expected_author) {
-			if let Some(equivocation_proof) = check_equivocation(
+		if P::verify(&sig, &to_sign[..], expected_author) {
+			match check_equivocation::<_, _, <P as Pair>::Public>(
 				client,
 				slot_now,
 				slot_num,
 				&header,
 				expected_author,
-			).map_err(|e| e.to_string())? {
-				info!(
-					"Slot author is equivocating at slot {} with headers {:?} and {:?}",
-					slot_num,
-					equivocation_proof.fst_header().hash(),
-					equivocation_proof.snd_header().hash(),
-				);
+			) {
+				Ok(Some(equivocation_proof)) => {
+					let log_str = format!(
+						"Slot author is equivocating at slot {} with headers {:?} and {:?}",
+						slot_num,
+						equivocation_proof.fst_header().hash(),
+						equivocation_proof.snd_header().hash(),
+					);
+					info!("{}", log_str);
+					Err(log_str)
+				},
+				Ok(None) => Ok(CheckedHeader::Checked(header, digest_item)),
+				Err(e) => Err(e.to_string()),
 			}
-
-			Ok(CheckedHeader::Checked(header, (slot_num, seal)))
 		} else {
-			Err(format!("Bad signature on {:?}", hash))
+			Err(aura_err!("Bad signature on {:?}", hash))
 		}
 	}
 }
@@ -540,7 +578,10 @@ impl<B: Block, C, P> Verifier<B> for AuraVerifier<C, P> where
 			&authorities[..],
 		)?;
 		match checked_header {
-			CheckedHeader::Checked(pre_header, (slot_num, seal)) => {
+			CheckedHeader::Checked(pre_header, seal) => {
+				let (slot_num, _) = seal.as_aura_seal()
+					.expect("check_header always returns a seal digest item; qed");
+
 				// if the body is passed through, we need to use the runtime
 				// to check that the internally-set timestamp in the inherents
 				// actually matches the slot set in the seal.

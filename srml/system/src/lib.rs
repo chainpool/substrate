@@ -540,12 +540,10 @@ impl<T: Trait> Module<T> {
 		number: &T::BlockNumber,
 		parent_hash: &T::Hash,
 		txs_root: &T::Hash,
-		digest: &T::Digest,
 	) {
 		// populate environment
 		storage::unhashed::put(well_known_keys::EXTRINSIC_INDEX, &0u32);
 		<Number<T>>::put(number);
-		<Digest<T>>::put(digest);
 		<ParentHash<T>>::put(parent_hash);
 		<BlockHash<T>>::insert(*number - One::one(), parent_hash);
 		<ExtrinsicsRoot<T>>::put(txs_root);
@@ -821,7 +819,7 @@ mod tests {
 	#[test]
 	fn deposit_event_should_work() {
 		with_externalities(&mut new_test_ext(), || {
-			System::initialize(&1, &[0u8; 32].into(), &[0u8; 32].into(), &Default::default());
+			System::initialize(&1, &[0u8; 32].into(), &[0u8; 32].into());
 			System::note_finished_extrinsics();
 			System::deposit_event(1u16);
 			System::finalize();
@@ -836,7 +834,7 @@ mod tests {
 				]
 			);
 
-			System::initialize(&2, &[0u8; 32].into(), &[0u8; 32].into(), &Default::default());
+			System::initialize(&2, &[0u8; 32].into(), &[0u8; 32].into());
 			System::deposit_event(42u16);
 			System::note_applied_extrinsic(&Ok(()), 0);
 			System::note_applied_extrinsic(&Err(""), 0);
@@ -857,7 +855,7 @@ mod tests {
 		with_externalities(&mut new_test_ext(), || {
 			const BLOCK_NUMBER: u64 = 1;
 
-			System::initialize(&BLOCK_NUMBER, &[0u8; 32].into(), &[0u8; 32].into(), &Default::default());
+			System::initialize(&BLOCK_NUMBER, &[0u8; 32].into(), &[0u8; 32].into());
 			System::note_finished_extrinsics();
 
 			let topics = vec![
