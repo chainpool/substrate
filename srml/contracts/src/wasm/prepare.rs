@@ -20,33 +20,29 @@
 
 use crate::wasm::env_def::ImportSatisfyCheck;
 use crate::wasm::PrefabWasmModule;
-use crate::{Schedule, Trait};
+use crate::Schedule;
 
-use parity_wasm::elements::{self, Internal, External, MemoryType, Type};
+use parity_wasm::elements::{self, Internal, External, MemoryType, Type, ValueType};
 use pwasm_utils;
 use pwasm_utils::rules;
 use rstd::prelude::*;
-use runtime_primitives::traits::{UniqueSaturatedInto, SaturatedConversion};
+use sr_primitives::traits::{SaturatedConversion};
 
-struct ContractModule<'a, Gas: 'a> {
+struct ContractModule<'a> {
 	/// A deserialized module. The module is valid (this is Guaranteed by `new` method).
-	///
-	/// An `Option` is used here for loaning (`take()`-ing) the module.
-	/// Invariant: Can't be `None` (i.e. on enter and on exit from the function
-	/// the value *must* be `Some`).
-	module: Option<elements::Module>,
-	schedule: &'a Schedule<Gas>,
+	module: elements::Module,
+	schedule: &'a Schedule,
 }
 
-impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<'a, Gas> {
+impl<'a> ContractModule<'a> {
 	/// Creates a new instance of `ContractModule`.
 	///
 	/// Returns `Err` if the `original_code` couldn't be decoded or
 	/// if it contains an invalid module.
 	fn new(
 		original_code: &[u8],
-		schedule: &'a Schedule<Gas>,
-	) -> Result<ContractModule<'a, Gas>, &'static str> {
+		schedule: &'a Schedule,
+	) -> Result<Self, &'static str> {
 		use wasmi_validation::{validate_module, PlainValidator};
 
 		let module =
@@ -58,7 +54,7 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 		// Return a `ContractModule` instance with
 		// __valid__ module.
 		Ok(ContractModule {
-			module: Some(module),
+			module,
 			schedule,
 		})
 	}
@@ -69,11 +65,7 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 	/// Memory section contains declarations of internal linear memories, so if we find one
 	/// we reject such a module.
 	fn ensure_no_internal_memory(&self) -> Result<(), &'static str> {
-		let module = self
-			.module
-			.as_ref()
-			.expect("On entry to the function `module` can't be None; qed");
-		if module
+		if self.module
 			.memory_section()
 			.map_or(false, |ms| ms.entries().len() > 0)
 		{
@@ -82,7 +74,70 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 		Ok(())
 	}
 
-	fn inject_gas_metering(&mut self) -> Result<(), &'static str> {
+	/// Ensures that tables declared in the module are not too big.
+	fn ensure_table_size_limit(&self, limit: u32) -> Result<(), &'static str> {
+        if let Some(table_section) = self.module.table_section() {
+			// In Wasm MVP spec, there may be at most one table declared. Double check this
+			// explicitly just in case the Wasm version changes.
+			if table_section.entries().len() > 1 {
+				return Err("multiple tables declared");
+			}
+			if let Some(table_type) = table_section.entries().first() {
+				// Check the table's initial size as there is no instruction or environment function
+				// capable of growing the table.
+				if table_type.limits().initial() > limit {
+					return Err("table exceeds maximum size allowed")
+				}
+			}
+		}
+		Ok(())
+	}
+
+	/// Ensures that no floating point types are in use.
+	fn ensure_no_floating_types(&self) -> Result<(), &'static str> {
+		if let Some(global_section) = self.module.global_section() {
+			for global in global_section.entries() {
+				match global.global_type().content_type() {
+					ValueType::F32 | ValueType::F64 =>
+						return Err("use of floating point type in globals is forbidden"),
+					_ => {}
+				}
+			}
+		}
+
+		if let Some(code_section) = self.module.code_section() {
+			for func_body in code_section.bodies() {
+				for local in func_body.locals() {
+					match local.value_type() {
+						ValueType::F32 | ValueType::F64 =>
+							return Err("use of floating point type in locals is forbidden"),
+						_ => {}
+					}
+				}
+			}
+		}
+
+		if let Some(type_section) = self.module.type_section() {
+			for wasm_type in type_section.types() {
+				match wasm_type {
+					Type::Function(func_type) => {
+						let return_type = func_type.return_type();
+						for value_type in func_type.params().iter().chain(return_type.iter()) {
+							match value_type {
+								ValueType::F32 | ValueType::F64 =>
+									return Err("use of floating point type in function types is forbidden"),
+								_ => {}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		Ok(())
+	}
+
+	fn inject_gas_metering(self) -> Result<Self, &'static str> {
 		let gas_rules =
 			rules::Set::new(
 				self.schedule.regular_op_cost.clone().saturated_into(),
@@ -91,30 +146,22 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 			.with_grow_cost(self.schedule.grow_mem_cost.clone().saturated_into())
 			.with_forbidden_floats();
 
-		let module = self
-			.module
-			.take()
-			.expect("On entry to the function `module` can't be `None`; qed");
-
-		let contract_module = pwasm_utils::inject_gas_counter(module, &gas_rules)
+		let contract_module = pwasm_utils::inject_gas_counter(self.module, &gas_rules)
 			.map_err(|_| "gas instrumentation failed")?;
-
-		self.module = Some(contract_module);
-		Ok(())
+		Ok(ContractModule {
+			module: contract_module,
+			schedule: self.schedule,
+		})
 	}
 
-	fn inject_stack_height_metering(&mut self) -> Result<(), &'static str> {
-		let module = self
-			.module
-			.take()
-			.expect("On entry to the function `module` can't be `None`; qed");
-
+	fn inject_stack_height_metering(self) -> Result<Self, &'static str> {
 		let contract_module =
-			pwasm_utils::stack_height::inject_limiter(module, self.schedule.max_stack_height)
+			pwasm_utils::stack_height::inject_limiter(self.module, self.schedule.max_stack_height)
 				.map_err(|_| "stack height instrumentation failed")?;
-
-		self.module = Some(contract_module);
-		Ok(())
+		Ok(ContractModule {
+			module: contract_module,
+			schedule: self.schedule,
+		})
 	}
 
 	/// Check that the module has required exported functions. For now
@@ -128,10 +175,7 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 		let mut deploy_found = false;
 		let mut call_found = false;
 
-		let module = self
-			.module
-			.as_ref()
-			.expect("On entry to the function `module` can't be `None`; qed");
+		let module = &self.module;
 
 		let types = module.type_section().map(|ts| ts.types()).unwrap_or(&[]);
 		let export_entries = module
@@ -183,14 +227,20 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 			};
 
 			// Then check the signature.
-			// Both "call" and "deploy" has a () -> () function type.
+			// Both "call" and "deploy" has a [] -> [] or [] -> [i32] function type.
+			//
+			// The [] -> [] signature predates the [] -> [i32] signature and is supported for
+			// backwards compatibility. This will likely be removed once ink! is updated to
+			// generate modules with the new function signatures.
 			let func_ty_idx = func_entries.get(fn_idx as usize)
 				.ok_or_else(|| "export refers to non-existent function")?
 				.type_ref();
 			let Type::Function(ref func_ty) = types
 				.get(func_ty_idx as usize)
 				.ok_or_else(|| "function has a non-existent type")?;
-			if !(func_ty.params().is_empty() && func_ty.return_type().is_none()) {
+			if !func_ty.params().is_empty() ||
+				!(func_ty.return_type().is_none() ||
+					func_ty.return_type() == Some(ValueType::I32)) {
 				return Err("entry point has wrong signature");
 			}
 		}
@@ -213,10 +263,7 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 	///   their signatures.
 	/// - if there is a memory import, returns it's descriptor
 	fn scan_imports<C: ImportSatisfyCheck>(&self) -> Result<Option<&MemoryType>, &'static str> {
-		let module = self
-			.module
-			.as_ref()
-			.expect("On entry to the function `module` can't be `None`; qed");
+		let module = &self.module;
 
 		let types = module.type_section().map(|ts| ts.types()).unwrap_or(&[]);
 		let import_entries = module
@@ -269,13 +316,9 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 		Ok(imported_mem_type)
 	}
 
-	fn into_wasm_code(mut self) -> Result<Vec<u8>, &'static str> {
-		elements::serialize(
-			self.module
-				.take()
-				.expect("On entry to the function `module` can't be `None`; qed"),
-		)
-		.map_err(|_| "error serializing instrumented module")
+	fn into_wasm_code(self) -> Result<Vec<u8>, &'static str> {
+		elements::serialize(self.module)
+			.map_err(|_| "error serializing instrumented module")
 	}
 }
 
@@ -290,13 +333,15 @@ impl<'a, Gas: 'a + From<u32> + UniqueSaturatedInto<u32> + Clone> ContractModule<
 /// - all imported functions from the external environment matches defined by `env` module,
 ///
 /// The preprocessing includes injecting code for gas metering and metering the height of stack.
-pub fn prepare_contract<T: Trait, C: ImportSatisfyCheck>(
+pub fn prepare_contract<C: ImportSatisfyCheck>(
 	original_code: &[u8],
-	schedule: &Schedule<T::Gas>,
+	schedule: &Schedule,
 ) -> Result<PrefabWasmModule, &'static str> {
 	let mut contract_module = ContractModule::new(original_code, schedule)?;
 	contract_module.scan_exports()?;
 	contract_module.ensure_no_internal_memory()?;
+	contract_module.ensure_table_size_limit(schedule.max_table_size)?;
+	contract_module.ensure_no_floating_types()?;
 
 	struct MemoryDefinition {
 		initial: u32,
@@ -332,8 +377,9 @@ pub fn prepare_contract<T: Trait, C: ImportSatisfyCheck>(
 		}
 	};
 
-	contract_module.inject_gas_metering()?;
-	contract_module.inject_stack_height_metering()?;
+	contract_module = contract_module
+		.inject_gas_metering()?
+		.inject_stack_height_metering()?;
 
 	Ok(PrefabWasmModule {
 		schedule_version: schedule.version,
@@ -347,7 +393,6 @@ pub fn prepare_contract<T: Trait, C: ImportSatisfyCheck>(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::tests::Test;
 	use crate::exec::Ext;
 	use std::fmt;
 	use wabt;
@@ -364,7 +409,7 @@ mod tests {
 	define_env!(TestEnv, <E: Ext>,
 		panic(_ctx) => { unreachable!(); },
 
-		// gas is an implementation defined function and a contract can't import it.
+		// gas is an implementation defined function and a contracts can't import it.
 		gas(_ctx, _amount: u32) => { unreachable!(); },
 
 		nop(_ctx, _unused: u64) => { unreachable!(); },
@@ -377,8 +422,8 @@ mod tests {
 			#[test]
 			fn $name() {
 				let wasm = wabt::Wat2Wasm::new().validate(false).convert($wat).unwrap();
-				let schedule = Schedule::<u64>::default();
-				let r = prepare_contract::<Test, TestEnv>(wasm.as_ref(), &schedule);
+				let schedule = Schedule::default();
+				let r = prepare_contract::<TestEnv>(wasm.as_ref(), &schedule);
 				assert_matches!(r, $($expected)*);
 			}
 		};
@@ -406,7 +451,7 @@ mod tests {
 		// Tests below assumes that maximum page number is configured to a certain number.
 		#[test]
 		fn assume_memory_size() {
-			assert_eq!(Schedule::<u64>::default().max_memory_pages, 16);
+			assert_eq!(Schedule::default().max_memory_pages, 16);
 		}
 
 		prepare_test!(memory_with_one_page,
@@ -529,6 +574,49 @@ mod tests {
 		);
 	}
 
+	mod tables {
+		use super::*;
+
+		// Tests below assumes that maximum table size is configured to a certain number.
+		#[test]
+		fn assume_table_size() {
+			assert_eq!(Schedule::default().max_table_size, 16384);
+		}
+
+		prepare_test!(no_tables,
+			r#"
+			(module
+				(func (export "call"))
+				(func (export "deploy"))
+			)
+			"#,
+			Ok(_)
+		);
+
+		prepare_test!(table_valid_size,
+			r#"
+			(module
+				(table 10000 funcref)
+
+				(func (export "call"))
+				(func (export "deploy"))
+			)
+			"#,
+			Ok(_)
+		);
+
+		prepare_test!(table_too_big,
+			r#"
+			(module
+				(table 20000 funcref)
+
+				(func (export "call"))
+				(func (export "deploy"))
+			)"#,
+			Err("table exceeds maximum size allowed")
+		);
+	}
+
 	mod imports {
 		use super::*;
 
@@ -544,7 +632,7 @@ mod tests {
 			Ok(_)
 		);
 
-		// even though gas is defined the contract can't import it since
+		// even though gas is defined the contracts can't import it since
 		// it is an implementation defined.
 		prepare_test!(can_not_import_gas_function,
 			r#"
@@ -620,9 +708,9 @@ mod tests {
 				)
 				"#
 			).unwrap();
-			let mut schedule = Schedule::<u64>::default();
+			let mut schedule = Schedule::default();
 			schedule.enable_println = true;
-			let r = prepare_contract::<Test, TestEnv>(wasm.as_ref(), &schedule);
+			let r = prepare_contract::<TestEnv>(wasm.as_ref(), &schedule);
 			assert_matches!(r, Ok(_));
 		}
 	}
@@ -702,6 +790,50 @@ mod tests {
 			)
 			"#,
 			Err("unknown export: expecting only deploy and call functions")
+		);
+
+		prepare_test!(global_float,
+			r#"
+			(module
+				(global $x f32 (f32.const 0))
+				(func (export "call"))
+				(func (export "deploy"))
+			)
+			"#,
+			Err("use of floating point type in globals is forbidden")
+		);
+
+		prepare_test!(local_float,
+			r#"
+			(module
+				(func $foo (local f32))
+				(func (export "call"))
+				(func (export "deploy"))
+			)
+			"#,
+			Err("use of floating point type in locals is forbidden")
+		);
+
+		prepare_test!(param_float,
+			r#"
+			(module
+				(func $foo (param f32))
+				(func (export "call"))
+				(func (export "deploy"))
+			)
+			"#,
+			Err("use of floating point type in function types is forbidden")
+		);
+
+		prepare_test!(result_float,
+			r#"
+			(module
+				(func $foo (result f32) (f32.const 0))
+				(func (export "call"))
+				(func (export "deploy"))
+			)
+			"#,
+			Err("use of floating point type in function types is forbidden")
 		);
 	}
 }

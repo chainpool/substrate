@@ -451,7 +451,7 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 				.map_err(Into::into))
 	}
 
-	/// Execute a call to a contract on top of state in a block of given hash
+	/// Execute a call to a contracts on top of state in a block of given hash
 	/// AND returning execution proof.
 	///
 	/// No changes are made.
