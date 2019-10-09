@@ -158,7 +158,14 @@ impl StorageApi for () {
 		}).expect("child_storage_root cannot be called outside of an Externalities-provided environment.")
 	}
 
-	fn storage_changes_root(parent_hash: [u8; 32]) -> Option<[u8; 32]> {
+	fn storage_changes_root(parent_hash: [u8; 32], _parent_num: u64) -> Option<[u8; 32]> {
+		ext::with(|ext|
+			// not pass parent number, tag1, for std
+			ext.storage_changes_root(parent_hash.into()).map(|h| h.map(|h| h.into()))
+		).unwrap_or(Ok(None)).expect("Invalid parent hash passed to storage_changes_root")
+	}
+
+	fn storage_changes_root2(parent_hash: [u8; 32]) -> Option<[u8; 32]> {
 		ext::with(|ext|
 			ext.storage_changes_root(parent_hash.into()).map(|h| h.map(|h| h.into()))
 		).unwrap_or(Ok(None)).expect("Invalid parent hash passed to storage_changes_root")
