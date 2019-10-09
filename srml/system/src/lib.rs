@@ -562,6 +562,7 @@ impl<T: Trait> Module<T> {
 
 	/// Remove temporary "environment" entries in storage.
 	pub fn finalize() -> T::Header {
+		use rstd::convert::TryInto;
 		<ExtrinsicCount<T>>::kill();
 		<AllExtrinsicsWeight<T>>::kill();
 
@@ -570,7 +571,7 @@ impl<T: Trait> Module<T> {
 		let mut digest = <Digest<T>>::take();
 		let extrinsics_root = <ExtrinsicsRoot<T>>::take();
 		let storage_root = T::Hashing::storage_root();
-		let storage_changes_root = T::Hashing::storage_changes_root(parent_hash);
+		let storage_changes_root = T::Hashing::storage_changes_root(parent_hash, number.try_into().unwrap_or(1) as u64 - 1);
 
 		// we can't compute changes trie root earlier && put it to the Digest
 		// because it will include all currently existing temporaries.

@@ -141,7 +141,10 @@ export_api! {
 		fn child_storage_root(storage_key: &[u8]) -> Vec<u8>;
 
 		/// "Commit" all existing operations and get the resultant storage change root.
-		fn storage_changes_root(parent_hash: [u8; 32]) -> Option<[u8; 32]>;
+		fn storage_changes_root(parent_hash: [u8; 32], parent_num: u64) -> Option<[u8; 32]>;
+
+		/// "Commit" all existing operations and get the resultant storage change root.
+		fn storage_changes_root2(parent_hash: [u8; 32]) -> Option<[u8; 32]>;
 
 		/// A trie root formed from the enumerated items.
 		/// TODO [#2382] remove (just use `ordered_trie_root` (NOTE currently not implemented for without_std))
