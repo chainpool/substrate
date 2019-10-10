@@ -38,6 +38,7 @@ use runtime_primitives::ApplyError;
 use transaction_pool::txpool::{self, Pool as TransactionPool};
 use inherents::InherentData;
 use substrate_telemetry::{telemetry, CONSENSUS_INFO};
+use primitives::storage::{StorageKey, well_known_keys};
 
 /// Build new blocks.
 pub trait BlockBuilder<Block: BlockT> {
@@ -55,7 +56,7 @@ pub trait AuthoringApi: Send + Sync + ProvideRuntimeApi where
 	type Error: std::error::Error;
 
 	/// Build a block on top of the given block, with inherent extrinsics and
-	fn build_block<F: FnMut(&mut dyn BlockBuilder<Self::Block>) -> ()>(
+	fn build_block<F: FnMut(&mut dyn BlockBuilder<Self::Block>, u32) -> ()>(
 		&self,
 		at: &BlockId<Self::Block>,
 		inherent_data: InherentData,
@@ -89,7 +90,7 @@ impl<B, E, Block, RA> AuthoringApi for SubstrateClient<B, E, Block, RA> where
 	type Block = Block;
 	type Error = client::error::Error;
 
-	fn build_block<F: FnMut(&mut dyn BlockBuilder<Self::Block>) -> ()>(
+	fn build_block<F: FnMut(&mut dyn BlockBuilder<Self::Block>, u32) -> ()>(
 		&self,
 		at: &BlockId<Self::Block>,
 		inherent_data: InherentData,
@@ -104,7 +105,11 @@ impl<B, E, Block, RA> AuthoringApi for SubstrateClient<B, E, Block, RA> where
 		runtime_api.inherent_extrinsics_with_context(at, ExecutionContext::BlockConstruction, inherent_data)?
 			.into_iter().try_for_each(|i| block_builder.push(i))?;
 
-		build_ctx(&mut block_builder);
+		const MAX_EXTRINSICS_COUNT: u32 = 50;
+		let max_extrinsics_count = match self.storage(at, &StorageKey(well_known_keys::MAX_EXTRINSICS_COUNT.to_vec())) {
+			Ok(Some(count)) => Decode::decode(&mut count.0.as_slice()).unwrap_or(MAX_EXTRINSICS_COUNT),
+			_ => MAX_EXTRINSICS_COUNT, };
+		build_ctx(&mut block_builder, max_extrinsics_count);
 
 		block_builder.bake().map_err(Into::into)
 	}
@@ -207,7 +212,7 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 		let block = self.client.build_block(
 			&self.parent_id,
 			inherent_data,
-			|block_builder| {
+			|block_builder, max_extrinsics_count| {
 			// proceed with transactions
 			use runtime_primitives::traits::SaturatedConversion;
             let session_change_number = 150_u64;
@@ -217,6 +222,8 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 				let mut skipped = 0;
 				let mut unqueue_invalid = Vec::new();
 				let pending_iterator = self.transaction_pool.ready();
+
+				let mut extrinsics_count = 0;
 
 				debug!("Attempting to push transactions from the pool.");
 				for pending in pending_iterator {
@@ -228,7 +235,12 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 					trace!("[{:?}] Pushing to the block.", pending.hash);
 					match block_builder.push_extrinsic(pending.data.clone()) {
 						Ok(()) => {
+							extrinsics_count = extrinsics_count + 1;
 							debug!("[{:?}] Pushed to the block.", pending.hash);
+							if extrinsics_count > max_extrinsics_count {
+								info!("max extrinsics count: {:?}", max_extrinsics_count);
+								break;
+							}
 						}
 						Err(error::Error::ApplyExtrinsicFailed(ApplyError::FullBlock)) => {
 							if is_first {
