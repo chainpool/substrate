@@ -113,7 +113,7 @@ impl indices::Trait for Runtime {
 
 impl balances::Trait for Runtime {
 	type Balance = Balance;
-	type OnFreeBalanceZero = ((Staking, Contract), Session);
+	type OnFreeBalanceZero = ((Staking, Contracts), Session);
 	type OnNewAccount = Indices;
 	type Event = Event;
 	type TransactionPayment = ();
@@ -202,16 +202,49 @@ impl treasury::Trait for Runtime {
 	type MintedForSpending = ();
 	type ProposalRejection = ();
 }
+pub use contracts::Gas;
 
-impl contract::Trait for Runtime {
+pub const MILLICENTS: Balance = 1_000_000_000;
+pub const CENTS: Balance = 1_000 * MILLICENTS;    // assume this is worth about a cent.
+pub const DOLLARS: Balance = 100 * CENTS;
+
+parameter_types! {
+	pub const ContractTransferFee: Balance = 1 * CENTS;
+	pub const ContractCreationFee: Balance = 1 * CENTS;
+	pub const ContractTransactionBaseFee: Balance = 1 * CENTS;
+	pub const ContractTransactionByteFee: Balance = 10 * MILLICENTS;
+	pub const ContractFee: Balance = 1 * CENTS;
+	pub const TombstoneDeposit: Balance = 1 * DOLLARS;
+	pub const RentByteFee: Balance = 1 * DOLLARS;
+	pub const RentDepositOffset: Balance = 1000 * DOLLARS;
+	pub const SurchargeReward: Balance = 150 * DOLLARS;
+}
+
+impl contracts::Trait for Runtime {
 	type Currency = Balances;
 	type Call = Call;
 	type Event = Event;
-	type Gas = u64;
-	type DetermineContractAddress = contract::SimpleAddressDeterminator<Runtime>;
-	type ComputeDispatchFee = contract::DefaultDispatchFeeComputor<Runtime>;
-	type TrieIdGenerator = contract::TrieIdFromParentCounter<Runtime>;
+//	type Gas = u64;
+	type DetermineContractAddress = contracts::SimpleAddressDeterminator<Runtime>;
+	type ComputeDispatchFee = contracts::DefaultDispatchFeeComputor<Runtime>;
+	type TrieIdGenerator = contracts::TrieIdFromParentCounter<Runtime>;
 	type GasPayment = ();
+	type SignedClaimHandicap = contracts::DefaultSignedClaimHandicap;
+	type TombstoneDeposit = TombstoneDeposit;
+	type StorageSizeOffset = contracts::DefaultStorageSizeOffset;
+	type RentByteFee = RentByteFee;
+	type RentDepositOffset = RentDepositOffset;
+	type SurchargeReward = SurchargeReward;
+	type TransferFee = ContractTransferFee;
+	type CreationFee = ContractCreationFee;
+	type TransactionBaseFee = ContractTransactionBaseFee;
+	type TransactionByteFee = ContractTransactionByteFee;
+	type ContractFee = ContractFee;
+	type CallBaseFee = contracts::DefaultCallBaseFee;
+	type InstantiateBaseFee = contracts::DefaultInstantiateBaseFee;
+	type MaxDepth = contracts::DefaultMaxDepth;
+	type MaxValueSize = contracts::DefaultMaxValueSize;
+	type BlockGasLimit = contracts::DefaultBlockGasLimit;
 }
 
 impl sudo::Trait for Runtime {
@@ -250,7 +283,7 @@ construct_runtime!(
 		FinalityTracker: finality_tracker::{Module, Call, Inherent},
 		Grandpa: grandpa::{Module, Call, Storage, Config<T>, Log(), Event<T>},
 		Treasury: treasury,
-		Contract: contract::{Module, Call, Storage, Config<T>, Event<T>},
+		Contracts: contracts::{Module, Call, Storage, Config<T>, Event<T>},
 		Sudo: sudo,
 	}
 );

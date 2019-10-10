@@ -20,7 +20,7 @@ use primitives::{ed25519::Public as AuthorityId, ed25519, sr25519, Pair, crypto:
 use node_primitives::AccountId;
 use node_runtime::{ConsensusConfig, CouncilSeatsConfig, DemocracyConfig,
 	SessionConfig, StakingConfig, StakerStatus, TimestampConfig, BalancesConfig, TreasuryConfig,
-	SudoConfig, ContractConfig, GrandpaConfig, IndicesConfig, Permill, Perbill};
+	SudoConfig, ContractsConfig, GrandpaConfig, IndicesConfig, Permill, Perbill};
 pub use node_runtime::GenesisConfig;
 use substrate_service;
 use hex_literal::hex;
@@ -143,24 +143,9 @@ fn staging_testnet_config_genesis() -> GenesisConfig {
 			spend_period: 1 * DAYS,
 			burn: Permill::from_percent(50),
 		}),
-		contract: Some(ContractConfig {
-			signed_claim_handicap: 2,
-			rent_byte_price: 4,
-			rent_deposit_offset: 1000,
-			storage_size_offset: 8,
-			surcharge_reward: 150,
-			tombstone_deposit: 16,
-			transaction_base_fee: 1 * CENTS,
-			transaction_byte_fee: 10 * MILLICENTS,
-			transfer_fee: 1 * CENTS,
-			creation_fee: 1 * CENTS,
-			contract_fee: 1 * CENTS,
-			call_base_fee: 1000,
-			create_base_fee: 1000,
-			gas_price: 1 * MILLICENTS,
-			max_depth: 1024,
-			block_gas_limit: 10_000_000,
+		contracts: Some(ContractsConfig {
 			current_schedule: Default::default(),
+			gas_price: 1 * MILLICENTS,
 		}),
 		sudo: Some(SudoConfig {
 			key: endowed_accounts[0].clone(),
@@ -237,28 +222,28 @@ pub fn testnet_genesis(
 	const ENDOWMENT: u128 = 1 << 20;
 
 	let council_desired_seats = (endowed_accounts.len() / 2 - initial_authorities.len()) as u32;
-	let mut contract_config = ContractConfig {
-		signed_claim_handicap: 2,
-		rent_byte_price: 4,
-		rent_deposit_offset: 1000,
-		storage_size_offset: 8,
-		surcharge_reward: 150,
-		tombstone_deposit: 16,
-		transaction_base_fee: 1,
-		transaction_byte_fee: 0,
-		transfer_fee: 0,
-		creation_fee: 0,
-		contract_fee: 21,
-		call_base_fee: 135,
-		create_base_fee: 175,
-		gas_price: 1,
-		max_depth: 1024,
-		block_gas_limit: 10_000_000,
-		current_schedule: Default::default(),
-	};
-	// this should only be enabled on development chains
-	contract_config.current_schedule.enable_println = enable_println;
-
+//	let mut contract_config = ContractsConfig {
+//		signed_claim_handicap: 2,
+//		rent_byte_price: 4,
+//		rent_deposit_offset: 1000,
+//		storage_size_offset: 8,
+//		surcharge_reward: 150,
+//		tombstone_deposit: 16,
+//		transaction_base_fee: 1,
+//		transaction_byte_fee: 0,
+//		transfer_fee: 0,
+//		creation_fee: 0,
+//		contract_fee: 21,
+//		call_base_fee: 135,
+//		create_base_fee: 175,
+//		gas_price: 1,
+//		max_depth: 1024,
+//		block_gas_limit: 10_000_000,
+//		current_schedule: Default::default(),
+//	};
+//	// this should only be enabled on development chains
+//	contract_config.current_schedule.enable_println = enable_println;
+	const MILLICENTS: u128 = 1_000_000_000;
 	GenesisConfig {
 		consensus: Some(ConsensusConfig {
 			code: include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm").to_vec(),
@@ -321,7 +306,13 @@ pub fn testnet_genesis(
 			spend_period: 12 * 60 * 24,
 			burn: Permill::from_percent(50),
 		}),
-		contract: Some(contract_config),
+		contracts: Some(ContractsConfig {
+			current_schedule: contracts::Schedule {
+				enable_println, // this should only be enabled on development chains
+				..Default::default()
+			},
+			gas_price: 1 * MILLICENTS,
+		}),
 		sudo: Some(SudoConfig {
 			key: root_key,
 		}),

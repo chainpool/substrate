@@ -54,7 +54,7 @@ pub trait StateApi<Hash> {
 	/// RPC Metadata
 	type Metadata;
 
-	/// Call a contract at a block's state.
+	/// Call a contracts at a block's state.
 	#[rpc(name = "state_call", alias("state_callAt"))]
 	fn call(&self, name: String, bytes: Bytes, hash: Option<Hash>) -> Result<Bytes>;
 
