@@ -11,4 +11,4 @@ hyper = "0.12"
 jsonrpc-core-client = { version = "12.0.0", features = ["http", "ws"] }
 log = "0.4"
 node-primitives = { path = "../primitives" }
-substrate-rpc = { path = "../../core/rpc", version = "2.0.0" }
+substrate-rpc = { path = "../rpc", version = "2.0.0" }
