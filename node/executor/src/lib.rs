@@ -764,7 +764,7 @@ mod tests {
 		WasmExecutor::new().call(&mut t, 8, COMPACT_CODE,"Core_execute_block", &b.0).unwrap();
 
 		runtime_io::with_externalities(&mut t, || {
-			// Verify that the contract constructor worked well and code of TRANSFER contract is actually deployed.
+			// Verify that the contracts constructor worked well and code of TRANSFER contracts is actually deployed.
 			assert_eq!(
 				&contract::ContractInfoOf::<Runtime>::get(addr)
 					.and_then(|c| c.get_alive())

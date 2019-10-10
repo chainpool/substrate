@@ -254,31 +254,31 @@ pub mod ext {
 		///
 		/// See [`ext_set_storage`] for details.
 		///
-		/// A child storage is used e.g. by a contract.
+		/// A child storage is used e.g. by a contracts.
 		fn ext_set_child_storage(storage_key_data: *const u8, storage_key_len: u32, key_data: *const u8, key_len: u32, value_data: *const u8, value_len: u32);
 		/// A child storage function.
 		///
 		/// See [`ext_clear_storage`] for details.
 		///
-		/// A child storage is used e.g. by a contract.
+		/// A child storage is used e.g. by a contracts.
 		fn ext_clear_child_storage(storage_key_data: *const u8, storage_key_len: u32, key_data: *const u8, key_len: u32);
 		/// A child storage function.
 		///
 		/// See [`ext_exists_storage`] for details.
 		///
-		/// A child storage is used e.g. by a contract.
+		/// A child storage is used e.g. by a contracts.
 		fn ext_exists_child_storage(storage_key_data: *const u8, storage_key_len: u32, key_data: *const u8, key_len: u32) -> u32;
 		/// A child storage function.
 		///
 		/// See [`ext_kill_storage`] for details.
 		///
-		/// A child storage is used e.g. by a contract.
+		/// A child storage is used e.g. by a contracts.
 		fn ext_kill_child_storage(storage_key_data: *const u8, storage_key_len: u32);
 		/// A child storage function.
 		///
 		/// See [`ext_get_allocated_storage`] for details.
 		///
-		/// A child storage is used e.g. by a contract.
+		/// A child storage is used e.g. by a contracts.
 		fn ext_get_allocated_child_storage(
 			storage_key_data: *const u8,
 			storage_key_len: u32,
@@ -290,7 +290,7 @@ pub mod ext {
 		///
 		/// See [`ext_get_storage_into`] for details.
 		///
-		/// A child storage is used e.g. by a contract.
+		/// A child storage is used e.g. by a contracts.
 		fn ext_get_child_storage_into(
 			storage_key_data: *const u8,
 			storage_key_len: u32,
@@ -302,7 +302,7 @@ pub mod ext {
 		) -> u32;
 		/// Commits all changes and calculates the child-storage root.
 		///
-		/// A child storage is used e.g. by a contract.
+		/// A child storage is used e.g. by a contracts.
 		///
 		/// # Returns
 		///

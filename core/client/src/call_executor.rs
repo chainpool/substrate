@@ -42,7 +42,7 @@ where
 	/// Externalities error type.
 	type Error: state_machine::Error;
 
-	/// Execute a call to a contract on top of state in a block of given hash.
+	/// Execute a call to a contracts on top of state in a block of given hash.
 	///
 	/// No changes are made.
 	fn call<
@@ -90,7 +90,7 @@ where
 	/// No changes are made.
 	fn runtime_version(&self, id: &BlockId<B>) -> Result<RuntimeVersion, error::Error>;
 
-	/// Execute a call to a contract on top of given state.
+	/// Execute a call to a contracts on top of given state.
 	///
 	/// No changes are made.
 	fn call_at_state<
@@ -112,7 +112,7 @@ where
 		side_effects_handler: Option<&mut O>,
 	) -> Result<(NativeOrEncoded<R>, S::Transaction, Option<MemoryDB<H>>), error::Error>;
 
-	/// Execute a call to a contract on top of given state, gathering execution proof.
+	/// Execute a call to a contracts on top of given state, gathering execution proof.
 	///
 	/// No changes are made.
 	fn prove_at_state<S: state_machine::Backend<H>>(
@@ -130,7 +130,7 @@ where
 		self.prove_at_trie_state(trie_state, overlay, method, call_data)
 	}
 
-	/// Execute a call to a contract on top of given trie state, gathering execution proof.
+	/// Execute a call to a contracts on top of given trie state, gathering execution proof.
 	///
 	/// No changes are made.
 	fn prove_at_trie_state<S: state_machine::TrieBackendStorage<H>>(

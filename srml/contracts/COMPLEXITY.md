@@ -123,7 +123,7 @@ While these functions only modify the local `Map`, if changes made by them are c
 
 **complexity**: Each lookup has a logarithmical computing time to the number of already inserted entries. No additional memory is required.
 
-## create_contract
+## instantiate_contract
 
 Calls `contract_exists` and if it doesn't exist, do not modify the local `Map` similarly to `set_rent_allowance`.
 
@@ -172,15 +172,31 @@ Assuming marshaled size of a balance value is of the constant size we can neglec
 
 **complexity**: up to 2 DB reads and up to 2 DB writes (if flushed to the storage) in the standard case. If removal of the source account takes place then it will additionally perform a DB write per one storage entry that the account has. For the current `AccountDb` implementation computing complexity also depends on the depth of the `AccountDb` cascade. Memorywise it can be assumed to be constant.
 
+## Initialization
+
+Before a call or instantiate can be performed the execution context must be initialized.
+
+For the first call or instantiation in the handling of an extrinsic, this involves two calls:
+
+1. `<timestamp::Module<T>>::now()`
+2. `<system::Module<T>>::block_number()`
+
+The complexity of initialization depends on the complexity of these functions. In the current
+implementation they just involve a DB read.
+
+For subsequent calls and instantiations during contract execution, the initialization requires no
+expensive operations.
+
 ## Call
 
 This function receives input data for the contract execution. The execution consists of the following steps:
 
-1. Checking rent payment.
-2. Loading code from the DB.
-3. `transfer`-ing funds between the caller and the destination account.
-4. Executing the code of the destination account.
-5. Committing overlayed changed to the underlying `AccountDb`.
+1. Initialization of the execution context.
+2. Checking rent payment.
+3. Loading code from the DB.
+4. `transfer`-ing funds between the caller and the destination account.
+5. Executing the code of the destination account.
+6. Committing overlayed changed to the underlying `AccountDb`.
 
 **Note** that the complexity of executing the contract code should be considered separately.
 
@@ -197,7 +213,7 @@ and on top of that at most once per block:
 - `kill_child_storage`
 - mutation of `ContractInfoOf`
 
-Loading code most likely will trigger a DB read, since the code is immutable and therefore will not get into the cache (unless a suicide removes it, or it has been created in the same call chain).
+Loading code most likely will trigger a DB read, since the code is immutable and therefore will not get into the cache (unless a suicide removes it, or it has been instantiated in the same call chain).
 
 Also, `transfer` can make up to 2 DB reads and up to 2 DB writes (if flushed to the storage) in the standard case. If removal of the source account takes place then it will additionally perform a DB write per one storage entry that the account has.
 
@@ -207,15 +223,16 @@ Finally, all changes are `commit`-ted into the underlying overlay. The complexit
 - Only for the first invocation of the contract: up to 5 DB reads and one DB write as well as logic executed by `ensure_can_withdraw`, `withdraw`, `make_free_balance_be`.
 - On top of that for every invocation: Up to 5 DB reads. DB read of the code is of dynamic size. There can also be up to 2 DB writes (if flushed to the storage). Additionally, if the source account removal takes place a DB write will be performed per one storage entry that the account has.
 
-## Create
+## Instantiate
 
-This function takes the code of the constructor and input data. Creation of a contract consists of the following steps:
+This function takes the code of the constructor and input data. Instantiation of a contract consists of the following steps:
 
-1. Calling `DetermineContractAddress` hook to determine an address for the contract,
-2. `transfer`-ing funds between self and the newly created contract.
-3. Executing the constructor code. This will yield the final code of the code.
-4. Storing the code for the newly created contract in the overlay.
-5. Committing overlayed changed to the underlying `AccountDb`.
+1. Initialization of the execution context.
+2. Calling `DetermineContractAddress` hook to determine an address for the contract,
+3. `transfer`-ing funds between self and the newly instantiated contract.
+4. Executing the constructor code. This will yield the final code of the code.
+5. Storing the code for the newly instantiated contract in the overlay.
+6. Committing overlayed changed to the underlying `AccountDb`.
 
 **Note** that the complexity of executing the constructor code should be considered separately.
 
@@ -286,7 +303,7 @@ Loading `input_data` should be charged in any case.
 
 **complexity**: All complexity comes from loading buffers and executing `call` executive function. The former component is proportional to the sizes of `callee`, `value` and `input_data` buffers. The latter component completely depends on the complexity of `call` executive function, and also dominated by it.
 
-## ext_create
+## ext_instantiate
 
 This function receives the following arguments:
 
@@ -300,13 +317,13 @@ It consists of the following steps:
 1. Loading `init_code` buffer from the sandbox memory (see sandboxing memory get) and then decoding it.
 2. Loading `value` buffer from the sandbox memory and then decoding it.
 3. Loading `input_data` buffer from the sandbox memory.
-4. Invoking `create` executive function.
+4. Invoking `instantiate` executive function.
 
 Loading of `value` buffer should be charged. This is because the size of the buffer is specified by the calling code, even though marshaled representation is, essentially, of constant size. This can be fixed by assigning an upper bound for size for `Balance`.
 
 Loading `init_code` and `input_data` should be charged in any case.
 
-**complexity**: All complexity comes from loading buffers and executing `create` executive function. The former component is proportional to the sizes of `init_code`, `value` and `input_data` buffers. The latter component completely depends on the complexity of `create` executive function and also dominated by it.
+**complexity**: All complexity comes from loading buffers and executing `instantiate` executive function. The former component is proportional to the sizes of `init_code`, `value` and `input_data` buffers. The latter component completely depends on the complexity of `instantiate` executive function and also dominated by it.
 
 ## ext_return
 
@@ -348,31 +365,27 @@ This function serializes the current block's timestamp into the scratch buffer.
 
 **complexity**: Assuming that the timestamp is of constant size, this function has constant complexity.
 
-## ext_input_size
-
-**complexity**: This function is of constant complexity.
-
-## ext_input_copy
-
-This function copies slice of data from the input buffer to the sandbox memory. The calling code specifies the slice length. Execution of the function consists of the following steps:
-
-1. Storing a specified slice of the input data into the sandbox memory (see sandboxing memory set)
-
-**complexity**: The computing complexity of this function is proportional to the length of the slice. No additional memory is required.
-
 ## ext_scratch_size
 
 This function returns the size of the scratch buffer.
 
 **complexity**: This function is of constant complexity.
 
-## ext_scratch_copy
+## ext_scratch_read
 
 This function copies slice of data from the scratch buffer to the sandbox memory. The calling code specifies the slice length. Execution of the function consists of the following steps:
 
 1. Storing a specified slice of the scratch buffer into the sandbox memory (see sandboxing memory set)
 
 **complexity**: The computing complexity of this function is proportional to the length of the slice. No additional memory is required.
+
+## ext_scratch_write
+
+This function copies slice of data from the sandbox memory to the scratch buffer. The calling code specifies the slice length. Execution of the function consists of the following steps:
+
+1. Loading a slice from the sandbox memory into the (see sandboxing memory get)
+
+**complexity**: Complexity is proportional to the length of the slice.
 
 ## ext_set_rent_allowance
 
@@ -396,3 +409,9 @@ It consists of the following steps:
 
 **complexity**: Assuming that the rent allowance is of constant size, this function has constant complexity. This
 function performs a DB read.
+
+## ext_block_number
+
+This function serializes the current block's number into the scratch buffer.
+
+**complexity**: Assuming that the block number is of constant size, this function has constant complexity.

@@ -301,7 +301,7 @@ decl_storage! {
 		/// The 'free' balance of a given account.
 		///
 		/// This is the only balance that matters in terms of most operations on tokens. It
-		/// alone is used to determine the balance when in the contract execution environment. When this
+		/// alone is used to determine the balance when in the contracts execution environment. When this
 		/// balance falls below the value of `ExistentialDeposit`, then the 'current account' is
 		/// deleted: specifically `FreeBalance`. Further, the `OnFreeBalanceZero` callback
 		/// is invoked, giving a chance to external modules to clean up data associated with
@@ -882,7 +882,7 @@ where
 		};
 		// If the balance is too low, then the account is reaped.
 		// NOTE: There are two balances for every account: `reserved_balance` and
-		// `free_balance`. This contract subsystem only cares about the latter: whenever
+		// `free_balance`. This contracts subsystem only cares about the latter: whenever
 		// the term "balance" is used *here* it should be assumed to mean "free balance"
 		// in the rest of the module.
 		// Free balance can never be less than ED. If that happens, it gets reduced to zero
