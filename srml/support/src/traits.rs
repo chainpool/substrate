@@ -213,6 +213,7 @@ pub trait Imbalance<Balance>: Sized {
 }
 
 /// Either a positive or a negative imbalance.
+#[cfg_attr(feature = "std", derive(Debug, PartialEq))]
 pub enum SignedImbalance<B, P: Imbalance<B>>{
 	/// A positive imbalance (funds have been created but none destroyed).
 	Positive(P),
