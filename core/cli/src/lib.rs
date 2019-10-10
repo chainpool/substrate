@@ -336,7 +336,7 @@ fn fill_network_configuration(
 	if config.listen_addresses.is_empty() {
 		let port = match cli.port {
 			Some(port) => port,
-			None => 30333,
+			None => 20222,
 		};
 
 		config.listen_addresses = vec![
@@ -486,10 +486,10 @@ where
 	let ws_interface: &str = if cli.ws_external { "0.0.0.0" } else { "127.0.0.1" };
 
 	config.rpc_http = Some(
-		parse_address(&format!("{}:{}", rpc_interface, 9933), cli.rpc_port)?
+		parse_address(&format!("{}:{}", rpc_interface, 8086), cli.rpc_port)?
 	);
 	config.rpc_ws = Some(
-		parse_address(&format!("{}:{}", ws_interface, 9944), cli.ws_port)?
+		parse_address(&format!("{}:{}", ws_interface, 8087), cli.ws_port)?
 	);
 	config.rpc_ws_max_connections = cli.ws_max_connections;
 	config.rpc_cors = cli.rpc_cors.unwrap_or_else(|| if is_dev {
@@ -573,7 +573,7 @@ where
 		let peer_id = keys.public().into_peer_id();
 		let addr = build_multiaddr![
 			Ip4([127, 0, 0, 1]),
-			Tcp(30333u16),
+			Tcp(20222u16),
 			P2p(peer_id)
 		];
 		spec.add_boot_node(addr)
