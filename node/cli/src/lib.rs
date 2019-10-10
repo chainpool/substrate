@@ -23,6 +23,7 @@ pub use cli::error;
 pub mod chain_spec;
 mod service;
 mod factory_impl;
+mod native_rpc;
 
 use tokio::prelude::Future;
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};
@@ -207,7 +208,7 @@ fn run_until_exit<T, C, E>(
 	e: E,
 ) -> error::Result<()>
 	where
-	    T: Deref<Target=substrate_service::Service<C>>,
+	    T: Deref<Target=substrate_service::Service<C>> + native_rpc::Rpc,
 		C: substrate_service::Components,
 		E: IntoExit,
 {
@@ -215,6 +216,9 @@ fn run_until_exit<T, C, E>(
 
 	let informant = cli::informant::build(&service);
 	runtime.executor().spawn(exit.until(informant).map(|_| ()));
+
+	let executor = runtime.executor();
+    let (_http, _ws) = service.start_rpc(executor.clone());
 
 	let _ = runtime.block_on(e.into_exit());
 	exit_send.fire();
