@@ -208,7 +208,11 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 			&self.parent_id,
 			inherent_data,
 			|block_builder| {
-				// proceed with transactions
+			// proceed with transactions
+			use runtime_primitives::traits::SaturatedConversion;
+            let session_change_number = 150_u64;
+            let zero_number = 0_u64;
+		  	if (self.parent_number.saturated_into::<u64>() + 1_u64) % session_change_number != zero_number {
 				let mut is_first = true;
 				let mut skipped = 0;
 				let mut unqueue_invalid = Vec::new();
@@ -251,6 +255,7 @@ impl<Block, C, A> Proposer<Block, C, A>	where
 				}
 
 				self.transaction_pool.remove_invalid(&unqueue_invalid);
+			}
 			})?;
 
 		info!("Prepared block for proposing at {} [hash: {:?}; parent_hash: {}; extrinsics: [{}]]",
