@@ -427,8 +427,9 @@ fn check_header<C, B: Block, P: Pair>(
 	where DigestItemFor<B>: CompatibleDigestItem<P>,
 		P::Signature: Decode,
 		C: client::backend::AuxStore,
-		P::Public: AsRef<P::Public> + Encode + Decode + PartialEq + Clone,
+		P::Public: AsRef<P::Public> + Encode + Decode + PartialEq + Clone + Debug,
 {
+	let header_src = header.clone();
 	let digest_item = match header.digest_mut().pop() {
 		Some(x) => x,
 		None => return Err(aura_err!("Header {:?} is unsealed", hash)),
@@ -441,6 +442,9 @@ fn check_header<C, B: Block, P: Pair>(
 	let (slot_num, sig) = digest_item.as_aura_seal().ok_or_else(|| {
 		aura_err!("Header {:?} is unsealed", hash)
 	})?;
+
+	trace!(target: "fisher", "[fisher]|header|num:{:}|hash:{:?}|pre_hash:{:?}|encoded:{:}",
+		   header_src.number(), header_src.hash(), header.hash(), hex::encode(header_src.encode()));
 
 	if slot_num > slot_now {
 		header.digest_mut().push(digest_item);
@@ -466,12 +470,21 @@ fn check_header<C, B: Block, P: Pair>(
 			) {
 				Ok(Some(equivocation_proof)) => {
 					let log_str = format!(
-						"Slot author is equivocating at slot {} with headers {:?} and {:?}",
+						"Slot author is equivocating at slot {} with headers {:?} and {:?}|expected author:{:?}",
+						slot_num,
+						equivocation_proof.fst_header().hash(),
+						equivocation_proof.snd_header().hash(),
+						expected_author
+					);
+					info!("{}", log_str);
+
+					debug!(target: "fisher", "[fisher]|equivocation|expected_author:{:?}|slot_num:{:}|fst_pre_hash:{:?}|snd_pre_hash:{:?}",
+						expected_author,
 						slot_num,
 						equivocation_proof.fst_header().hash(),
 						equivocation_proof.snd_header().hash(),
 					);
-					info!("{}", log_str);
+
 					Err(log_str)
 				},
 				Ok(None) => Ok(CheckedHeader::Checked(header, digest_item)),

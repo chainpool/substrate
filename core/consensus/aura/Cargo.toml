@@ -25,6 +25,7 @@ futures = "0.1.17"
 tokio-timer = "0.2.11"
 parking_lot = "0.8.0"
 log = "0.4"
+hex = "0.3"
 
 [dev-dependencies]
 keyring = { package = "substrate-keyring", path = "../../keyring" }
