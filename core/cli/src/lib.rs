@@ -416,11 +416,20 @@ where
 		),
 	};
 
+	#[cfg(not(feature = "msgbus-redis"))]
 	let role =
 		if cli.light {
 			service::Roles::LIGHT
 		} else if cli.validator || cli.shared_params.dev {
 			service::Roles::AUTHORITY
+		} else {
+			service::Roles::FULL
+		};
+
+	#[cfg(feature = "msgbus-redis")]
+	let role =
+		if cli.light {
+			service::Roles::LIGHT
 		} else {
 			service::Roles::FULL
 		};
@@ -525,6 +534,16 @@ where
 	S: FnOnce(&str) -> Result<Option<ChainSpec<FactoryGenesis<F>>>, String>,
 	RS: FnOnce(E, RunCmd, RP, FactoryFullConfiguration<F>) -> Result<(), String>,
  {
+	#[cfg(feature = "msgbus-redis")] {
+		let connect = cli.left.redis.clone().unwrap_or("127.0.0.1".to_string());
+		let connect = format!("redis://{}/", connect);
+		info!("redis {:?}", connect);
+		use srml_support::storage::redis::init_redis;
+		if let Err(e) = init_redis(&connect){
+			bail!(input_err(format!("Redis error!\n{}", e)))
+		};
+	}
+
 	let config = create_run_node_config::<F, _>(cli.left.clone(), spec_factory, impl_name, version)?;
 
 	run_service(exit, cli.left, cli.right, config).map_err(Into::into)
