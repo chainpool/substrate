@@ -58,7 +58,9 @@ where C: Components {
 			(SyncState::Downloading, Some(n)) => (format!("Syncing{}", speed()), format!(", target=#{}", n)),
 		};
 		last_number = Some(best_number);
-		let finalized_number: u64 = info.chain.finalized_number.saturated_into::<u64>();
+//		let finalized_number: u64 = info.chain.finalized_number.saturated_into::<u64>();
+		let (finalized_number, finalized_hash) = client.get_finalized_info(best_hash);
+		let finalized_number: u64 = finalized_number.saturated_into::<u64>();
 		let bandwidth_download = network.average_download_per_sec();
 		let bandwidth_upload = network.average_upload_per_sec();
 		info!(
@@ -70,7 +72,7 @@ where C: Components {
 			Colour::White.paint(format!("{}", best_number)),
 			best_hash,
 			Colour::White.paint(format!("{}", finalized_number)),
-			info.chain.finalized_hash,
+			finalized_hash.unwrap_or_default(),
 			TransferRateFormat(bandwidth_download),
 			TransferRateFormat(bandwidth_upload),
 		);

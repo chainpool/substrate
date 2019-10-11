@@ -122,7 +122,7 @@ construct_service_factory! {
 					justification_period: 4096,
 					name: Some(service.config.name.clone())
 				};
-
+				/*
 				match config.local_key {
 					None => {
 						executor.spawn(grandpa::run_grandpa_observer(
@@ -149,7 +149,7 @@ construct_service_factory! {
 						executor.spawn(grandpa::run_grandpa_voter(grandpa_config)?);
 					},
 				}
-
+				*/
 				Ok(service)
 			}
 		},
