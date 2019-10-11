@@ -349,7 +349,9 @@ impl<Components: components::Components> Service<Components> {
 			let best_hash = info.chain.best_hash;
 			let num_peers = sync_status.num_peers;
 			let txpool_status = transaction_pool_.status();
-			let finalized_number: u64 = info.chain.finalized_number.saturated_into::<u64>();
+//			let finalized_number: u64 = info.chain.finalized_number.saturated_into::<u64>();
+			let (finalized_number, finalized_hash) = client_.get_finalized_info(best_hash);
+			let finalized_number: u64 = finalized_number.saturated_into::<u64>();
 			let bandwidth_download = network_.average_download_per_sec();
 			let bandwidth_upload = network_.average_upload_per_sec();
 
@@ -379,7 +381,7 @@ impl<Components: components::Components> Service<Components> {
 				"cpu" => cpu_usage,
 				"memory" => memory,
 				"finalized_height" => finalized_number,
-				"finalized_hash" => ?info.chain.finalized_hash,
+				"finalized_hash" => ?finalized_hash.unwrap_or_default(),
 				"bandwidth_download" => bandwidth_download,
 				"bandwidth_upload" => bandwidth_upload,
 				"used_state_cache_size" => used_state_cache_size,

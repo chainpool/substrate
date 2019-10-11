@@ -873,6 +873,17 @@ impl<B, E, Block, RA> Client<B, E, Block, RA> where
 		result
 	}
 
+    pub fn get_finalized_info(&self, hash: Block::Hash) -> (NumberFor<Block>, Option<Block::Hash>) {
+		let finalized_number = match self.storage(&BlockId::Hash(hash),
+				&StorageKey(well_known_keys::AURA_FINALIZE.to_vec())) {
+			Ok(Some(number)) => Decode::decode(&mut number.0.as_slice()).unwrap_or(NumberFor::<Block>::zero()),
+			_ => NumberFor::<Block>::zero(),
+		};
+		let finalized_hash = self.block_hash(finalized_number).unwrap_or(None);
+
+		(finalized_number, finalized_hash)
+	}
+
 	fn execute_and_import_block(
 		&self,
 		operation: &mut ClientImportOperation<Block, Blake2Hasher, B>,
