@@ -10,9 +10,6 @@ pub fn load_wasm() -> Vec<u8> {
 pub fn put_code(raw_seed: &str, gas_limit: Gas, code: Vec<u8>) {
     let function = Call::Contracts(ContractsCall::put_code(gas_limit, code));
     let utx = build_tx(raw_seed, function);
-    println!("utx len: {}", utx.len());
-    // println!("utx: {:#?}", utx);
-    write_to_file(utx.clone());
     let h = submit_tx(utx);
     println!("put_code hash: {:?}", h);
 }
@@ -28,9 +25,14 @@ pub fn instantiate(
         endowment, gas_limit, code_hash, data,
     ));
     let utx = build_tx(raw_seed, function);
-    println!("utx len: {}", utx.len());
-    // println!("utx: {:#?}", utx);
-    write_to_file(utx.clone());
     let h = submit_tx(utx);
-    println!("put_code hash: {:?}", h);
+    println!("instantiate hash: {:?}", h);
+}
+
+pub fn call(raw_seed: &str, dest: AccountId, value: Balance, gas_limit: Gas, data: Vec<u8>) {
+    let dest: srml_indices::address::Address<AccountId, AccountIndex> = dest.into();
+    let function = Call::Contracts(ContractsCall::call(dest, value, gas_limit, data));
+    let utx = build_tx(raw_seed, function);
+    let h = submit_tx(utx);
+    println!("call hash: {:?}", h);
 }

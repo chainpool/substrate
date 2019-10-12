@@ -4929,6 +4929,7 @@ dependencies = [
  "sr-primitives 2.0.0",
  "srml-balances 2.0.0",
  "srml-contracts 2.0.0",
+ "srml-indices 2.0.0",
  "srml-support 2.0.0",
  "srml-system 2.0.0",
  "substrate 2.0.0",

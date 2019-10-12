@@ -6,10 +6,11 @@ mod system;
 mod tx_builder;
 
 use node_cli::chain_spec::get_account_id_from_seed;
-use node_primitives::{AccountId, Balance, BlockNumber, Hash, Index};
+use node_primitives::{AccountId, AccountIndex, Balance, BlockNumber, Hash, Index};
 use node_runtime::{BalancesCall, Call, Gas, Runtime};
 use parity_codec::{Compact, Decode, Encode};
 use sr_primitives::generic::Era;
+use srml_contracts::ContractAddressFor;
 use srml_support::storage::StorageMap;
 
 use std::fs::File;
@@ -25,7 +26,7 @@ use substrate_primitives::sr25519::Public as AddressPublic;
 use substrate_primitives::Pair as PairT;
 
 use chain::genesis_hash;
-use contracts::{instantiate, load_wasm, put_code};
+use contracts::{call, instantiate, load_wasm, put_code};
 use rpc::post;
 use state::{account_nonce, free_balance_of};
 use tx_builder::{build_tx, submit_tx};
@@ -71,13 +72,27 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     let wasm = load_wasm();
     let wasm_hash = blake2_256(&wasm);
+
     println!("WASM hash: {}", HexDisplay::from(&wasm_hash.as_ref()));
+
     let wasm_h: Hash = wasm_hash.clone().into();
+
     println!("WASM h: {}", HexDisplay::from(&wasm_h.as_ref()));
     println!("wasm.len(): {:?}", wasm.len());
-    // put_code("Alice", 1000_000_000_000, wasm);
 
+    // put_code("Alice", 1000_000_000_000, wasm);
     // instantiate("Alice", 10000000, 1000000000, wasm_hash.into(), vec![]);
+
+    let dest = srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
+        &wasm_h,
+        &vec![],
+        &alice,
+    );
+
+    // let input_data = Compact::from(4266279973u32).encode();
+    // let input_data = Compact::from(vec![4266279973u32]).encode();
+    let input_data = vec![4266279973u32].encode();
+    call("Alice", dest, 100000, 100000, input_data);
 
     Ok(())
 }

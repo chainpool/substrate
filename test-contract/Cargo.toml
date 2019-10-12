@@ -18,10 +18,14 @@ substrate = { path = "../" }
 node-cli = { path = "../node/cli" }
 node-primitives = { path = "../node/primitives" }
 node-runtime = { path = "../node/runtime" }
+
+substrate-primitives = { path = "../core/primitives" }
+
 srml-balances = { path = "../srml/balances" }
 srml-system = { path = "../srml/system" }
 srml-support = { path = "../srml/support" }
 srml-contracts = { path = "../srml/contracts" }
-substrate-primitives = { path = "../core/primitives" }
+srml-indices = { path = "../srml/indices" }
+
 
 sr-primitives = { path = "../core/sr-primitives", default-features = false }
