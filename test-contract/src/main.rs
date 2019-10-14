@@ -1,4 +1,5 @@
 mod chain;
+mod cmd;
 mod contracts;
 mod rpc;
 mod state;
@@ -16,6 +17,8 @@ use srml_support::storage::StorageMap;
 use std::fs::File;
 use std::io::Read;
 
+use structopt::StructOpt;
+
 use srml_contracts::Call as ContractsCall;
 
 use substrate_primitives::blake2_256;
@@ -26,6 +29,7 @@ use substrate_primitives::sr25519::Public as AddressPublic;
 use substrate_primitives::Pair as PairT;
 
 use chain::genesis_hash;
+use cmd::{Command, Substrate};
 use contracts::{call, instantiate, load_wasm, put_code};
 use rpc::post;
 use state::{account_nonce, free_balance_of};
@@ -63,8 +67,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
     let alice = get_account_id_from_seed("Alice");
     let bob = get_account_id_from_seed("Bob");
 
-    free_balance_of(&alice);
-    free_balance_of(&bob);
+    // free_balance_of(&alice);
+    // free_balance_of(&bob);
 
     // transfer("Alice", bob.clone(), 200);
     // free_balance_of(&alice);
@@ -73,26 +77,41 @@ fn main() -> Result<(), Box<std::error::Error>> {
     let wasm = load_wasm();
     let wasm_hash = blake2_256(&wasm);
 
-    println!("WASM hash: {}", HexDisplay::from(&wasm_hash.as_ref()));
-
     let wasm_h: Hash = wasm_hash.clone().into();
-
     println!("WASM h: {}", HexDisplay::from(&wasm_h.as_ref()));
-    println!("wasm.len(): {:?}", wasm.len());
-
-    // put_code("Alice", 1000_000_000_000, wasm);
-    // instantiate("Alice", 10000000, 1000000000, wasm_hash.into(), vec![]);
+    println!("code_hash: 0x{}", HexDisplay::from(&wasm_hash.as_ref()));
 
     let dest = srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
         &wasm_h,
         &vec![],
         &alice,
     );
+    println!("dest: {:?}", dest);
 
-    // let input_data = Compact::from(4266279973u32).encode();
     // let input_data = Compact::from(vec![4266279973u32]).encode();
-    let input_data = vec![4266279973u32].encode();
-    call("Alice", dest, 100000, 100000, input_data);
+    // let input_data = vec![4266279973u32].encode();
+    // println!("input_data: vec {:?}", input_data);
+    // flipper get: [37, 68, 74, 254]
+    let input_data = 4266279973u32.encode();
+    println!("input_data: u32 {:?}", input_data);
+
+    let opt = cmd::Substrate::from_args();
+
+    // parity/Substrate
+    // Instantiate::
+    // code_hash: 0xf4b1df2b2d11c7be74144b734e9cb207856c2a8e71108c92d89769b0cf517413
+    // input_data: []
+    // Alice
+    // caller: d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d (5GrwvaEF...)
+    // dest: df55f0e4e45118902a3f732a29a156bbd5f0ace82da3f749e44d736fcc1fc101 (5H7Y4jn4...)
+
+    match opt.cmd {
+        Command::PutCode => put_code("Alice", 1000_000_000_000, wasm),
+        Command::Instantiate => {
+            instantiate("Alice", 10000000, 1000000000, wasm_hash.into(), vec![])
+        }
+        Command::Call => call("Alice", dest, 10000000, 1000000, input_data),
+    }
 
     Ok(())
 }
