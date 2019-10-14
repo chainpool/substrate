@@ -1,7 +1,7 @@
 use super::*;
 
-pub fn load_wasm() -> Vec<u8> {
-    let mut file = File::open("/home/xlc/contract/flipper.wasm").unwrap();
+pub fn load_wasm(wasm_path: &str) -> Vec<u8> {
+    let mut file = File::open(wasm_path).unwrap();
     let mut data = Vec::new();
     file.read_to_end(&mut data).unwrap();
     data

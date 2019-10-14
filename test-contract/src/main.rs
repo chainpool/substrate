@@ -29,7 +29,7 @@ use substrate_primitives::sr25519::Public as AddressPublic;
 use substrate_primitives::Pair as PairT;
 
 use chain::genesis_hash;
-use cmd::{Command, Substrate};
+use cmd::*;
 use contracts::{call, instantiate, load_wasm, put_code};
 use rpc::post;
 use state::{account_nonce, free_balance_of};
@@ -74,27 +74,9 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // free_balance_of(&alice);
     // free_balance_of(&bob);
 
-    let wasm = load_wasm();
-    let wasm_hash = blake2_256(&wasm);
-
-    let wasm_h: Hash = wasm_hash.clone().into();
-    println!("WASM h: {}", HexDisplay::from(&wasm_h.as_ref()));
-    println!("code_hash: 0x{}", HexDisplay::from(&wasm_hash.as_ref()));
-
-    let dest = srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
-        &wasm_h,
-        &vec![],
-        &alice,
-    );
-    println!("dest: {:?}", dest);
-
     // let input_data = Compact::from(vec![4266279973u32]).encode();
     // let input_data = vec![4266279973u32].encode();
     // println!("input_data: vec {:?}", input_data);
-    // flipper get: [37, 68, 74, 254]
-    let input_data = 4266279973u32.encode();
-    println!("input_data: u32 {:?}", input_data);
-
     let opt = cmd::Substrate::from_args();
 
     // parity/Substrate
@@ -106,12 +88,63 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // dest: df55f0e4e45118902a3f732a29a156bbd5f0ace82da3f749e44d736fcc1fc101 (5H7Y4jn4...)
 
     match opt.cmd {
-        Command::PutCode => put_code("Alice", 1000_000_000_000, wasm),
-        Command::Instantiate => {
-            instantiate("Alice", 10000000, 1000000000, wasm_hash.into(), vec![])
-        }
-        Command::Call => call("Alice", dest, 10000000, 1000000, input_data),
+        Command::Flipper(flipper) => match flipper {
+            Flipper::PutCode => {
+                let wasm = load_wasm("/home/xlc/contract/flipper.wasm");
+                let wasm_hash = blake2_256(&wasm);
+                println!("code_hash: 0x{}", HexDisplay::from(&wasm_hash.as_ref()));
+                let wasm_h: Hash = wasm_hash.clone().into();
+                println!("WASM h: {}", HexDisplay::from(&wasm_h.as_ref()));
+
+                put_code("Alice", 1000_000_000_000, wasm);
+            }
+            Flipper::Instantiate => {
+                let wasm = load_wasm("/home/xlc/contract/flipper.wasm");
+                let wasm_hash = blake2_256(&wasm);
+                let wasm_h: Hash = wasm_hash.clone().into();
+                let dest =
+                    srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
+                        &wasm_h,
+                        &vec![],
+                        &alice,
+                    );
+                // 100000000000500
+                println!("dest: {:?}", dest);
+                instantiate(
+                    "Alice",
+                    10000000000050000000,
+                    1000000000,
+                    wasm_hash.into(),
+                    vec![],
+                );
+            }
+            Flipper::Get => {
+                let dest = flipper_dest(&alice);
+                // flipper get: [37, 68, 74, 254]
+                let input_data = 4266279973u32.encode();
+                println!("get input_data: u32 {:?}", input_data);
+                call("Alice", dest, 1000000000005000000, 1000000, input_data);
+            }
+            Flipper::Flip => {
+                let dest = flipper_dest(&alice);
+                let input_data = 970692492u32.encode();
+                println!("flip input_data: u32 {:?}", input_data);
+                call("Alice", dest, 1000000000005000000, 1000000, input_data);
+            }
+        },
     }
 
     Ok(())
+}
+
+fn flipper_dest(owner: &AccountId) -> AccountId {
+    let wasm = load_wasm("/home/xlc/contract/flipper.wasm");
+    let wasm_hash = blake2_256(&wasm);
+    let wasm_h: Hash = wasm_hash.clone().into();
+    let dest = srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
+        &wasm_h,
+        &vec![],
+        owner,
+    );
+    dest
 }

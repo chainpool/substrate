@@ -21,7 +21,18 @@ pub struct Substrate {
 
 #[derive(StructOpt, Debug, Clone)]
 pub enum Command {
+    #[structopt(name = "flipper")]
+    Flipper(Flipper),
+}
+
+#[derive(StructOpt, Debug, Clone)]
+pub enum Flipper {
+    #[structopt(name = "put_code")]
     PutCode,
+    #[structopt(name = "instantiate")]
     Instantiate,
-    Call,
+    #[structopt(name = "get")]
+    Get,
+    #[structopt(name = "flip")]
+    Flip,
 }
