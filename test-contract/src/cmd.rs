@@ -23,6 +23,8 @@ pub struct Substrate {
 pub enum Command {
     #[structopt(name = "flipper")]
     Flipper(Flipper),
+    #[structopt(name = "erc20")]
+    ERC20(ERC20),
 }
 
 #[derive(StructOpt, Debug, Clone)]
@@ -35,4 +37,18 @@ pub enum Flipper {
     Get,
     #[structopt(name = "flip")]
     Flip,
+}
+
+#[derive(StructOpt, Debug, Clone)]
+pub enum ERC20 {
+    #[structopt(name = "put_code")]
+    PutCode,
+    #[structopt(name = "instantiate")]
+    Instantiate,
+    #[structopt(name = "total_supply")]
+    TotalSupply,
+    #[structopt(name = "balance_of")]
+    BalanceOf,
+    #[structopt(name = "transfer")]
+    Transfer,
 }

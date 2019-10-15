@@ -63,6 +63,18 @@ fn write_to_file(utx: String) {
     }
 }
 
+fn read_abi(abi: &str) -> serde_json::Value {
+    let file = std::fs::File::open(abi).expect("file should open read only");
+    let json: serde_json::Value =
+        serde_json::from_reader(file).expect("file should be proper JSON");
+    json
+}
+
+pub const FLIPPER_WASM: &str = "/home/xlc/contract/flipper/flipper.wasm";
+pub const FLIPPER_ABI: &str = "/home/xlc/contract/flipper/old_abi.json";
+pub const ERC20_WASM: &str = "/home/xlc/contract/erc20/erc20.wasm";
+pub const ERC20_ABI: &str = "/home/xlc/contract/erc20/old_abi.json";
+
 fn main() -> Result<(), Box<std::error::Error>> {
     let alice = get_account_id_from_seed("Alice");
     let bob = get_account_id_from_seed("Bob");
@@ -88,63 +100,122 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // dest: df55f0e4e45118902a3f732a29a156bbd5f0ace82da3f749e44d736fcc1fc101 (5H7Y4jn4...)
 
     match opt.cmd {
-        Command::Flipper(flipper) => match flipper {
-            Flipper::PutCode => {
-                let wasm = load_wasm("/home/xlc/contract/flipper.wasm");
-                let wasm_hash = blake2_256(&wasm);
-                println!("code_hash: 0x{}", HexDisplay::from(&wasm_hash.as_ref()));
-                let wasm_h: Hash = wasm_hash.clone().into();
-                println!("WASM h: {}", HexDisplay::from(&wasm_h.as_ref()));
-
-                put_code("Alice", 1000_000_000_000, wasm);
-            }
-            Flipper::Instantiate => {
-                let wasm = load_wasm("/home/xlc/contract/flipper.wasm");
-                let wasm_hash = blake2_256(&wasm);
-                let wasm_h: Hash = wasm_hash.clone().into();
-                let dest =
-                    srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
-                        &wasm_h,
-                        &vec![],
-                        &alice,
-                    );
-                // 100000000000500
-                println!("dest: {:?}", dest);
-                instantiate(
-                    "Alice",
-                    10000000000050000000,
-                    1000000000,
-                    wasm_hash.into(),
-                    vec![],
-                );
-            }
-            Flipper::Get => {
-                let dest = flipper_dest(&alice);
-                // flipper get: [37, 68, 74, 254]
-                let input_data = 4266279973u32.encode();
-                println!("get input_data: u32 {:?}", input_data);
-                call("Alice", dest, 1000000000005000000, 1000000, input_data);
-            }
-            Flipper::Flip => {
-                let dest = flipper_dest(&alice);
-                let input_data = 970692492u32.encode();
-                println!("flip input_data: u32 {:?}", input_data);
-                call("Alice", dest, 1000000000005000000, 1000000, input_data);
-            }
-        },
+        Command::Flipper(flipper) => handle_flipper(flipper),
+        Command::ERC20(erc20) => handle_erc20(erc20),
     }
 
     Ok(())
 }
 
+fn handle_flipper(flipper: Flipper) {
+    let alice = get_account_id_from_seed("Alice");
+    match flipper {
+        Flipper::PutCode => {
+            let wasm = load_wasm(FLIPPER_WASM);
+            let wasm_hash = blake2_256(&wasm);
+            println!("code_hash: 0x{}", HexDisplay::from(&wasm_hash.as_ref()));
+            let wasm_h: Hash = wasm_hash.clone().into();
+            println!("WASM h: {}", HexDisplay::from(&wasm_h.as_ref()));
+
+            put_code("Alice", 1000_000_000_000, wasm);
+        }
+        Flipper::Instantiate => {
+            let wasm = load_wasm(FLIPPER_WASM);
+            let wasm_hash = blake2_256(&wasm);
+            let wasm_h: Hash = wasm_hash.clone().into();
+            let dest = srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
+                &wasm_h,
+                &vec![],
+                &alice,
+            );
+            // 100000000000500
+            println!("dest: {:?}", dest);
+            instantiate(
+                "Alice",
+                10000000000050000000,
+                1000000000,
+                wasm_hash.into(),
+                vec![],
+            );
+        }
+        Flipper::Get => {
+            let dest = flipper_dest(&alice);
+            // flipper get: [37, 68, 74, 254]
+            let input_data = 4266279973u32.encode();
+            println!("get input_data: u32 {:?}", input_data);
+            call("Alice", dest, 1000000000005000000, 1000000, input_data);
+        }
+        Flipper::Flip => {
+            let dest = flipper_dest(&alice);
+            let input_data = 970692492u32.encode();
+            println!("flip input_data: u32 {:?}", input_data);
+            call("Alice", dest, 1000000000005000000, 1000000, input_data);
+        }
+    }
+}
+
+fn contract_address_for(code_hash: &Hash, input_data: &[u8], owner: &AccountId) -> AccountId {
+    srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
+        code_hash, input_data, owner,
+    )
+}
+
+fn handle_erc20(erc20: ERC20) {
+    let alice = get_account_id_from_seed("Alice");
+    let bob = get_account_id_from_seed("Bob");
+
+    let wasm = load_wasm(ERC20_WASM);
+    let wasm_hash = blake2_256(&wasm);
+    println!("code_hash: 0x{}", HexDisplay::from(&wasm_hash.as_ref()));
+    let wasm_h: Hash = wasm_hash.clone().into();
+    println!("WASM h: {}", HexDisplay::from(&wasm_h.as_ref()));
+
+    let abi = read_abi(ERC20_ABI);
+
+    match erc20 {
+        ERC20::Instantiate => {
+            let init_value: Balance = 8000000000000u128;
+
+            let input_data = init_value.encode();
+            println!("init_value.encode: {:?}", input_data);
+            let dest = contract_address_for(&wasm_h, &input_data, &alice);
+            println!("caller: {:?}", alice);
+            println!("dest: {:?}", dest);
+        }
+        ERC20::BalanceOf => {
+            let deploy = abi.get("deploy");
+            let messages = abi.get("messages");
+            println!("---deploy: {:?}", deploy);
+            println!("----messages: {:?}", messages);
+            let mut input_data = vec![];
+            let selector = 3827153702u32.encode();
+            let args = alice.encode();
+            // encode the selector
+            // encode the args in order
+            input_data.extend_from_slice(&selector);
+            input_data.extend_from_slice(&args);
+            println!("======== [balance_of] selector: {:?}", selector);
+            println!("======== [balance_of] args: {:?}", args);
+            println!("======== [balance_of] input_data: {:?}", input_data);
+        }
+        ERC20::Transfer => {
+            let selector = 3374842663u32.encode();
+            let args0 = bob.encode();
+            let args1 = 3000000000000u128.encode();
+            println!("======== [balance_of] selector: {:?}", selector);
+            println!("======== [balance_of] args 0: {:?}", args0);
+            println!("======== [balance_of] args1: {:?}", args1);
+        }
+        _ => {
+            println!("======== [default]");
+        }
+    }
+}
+
 fn flipper_dest(owner: &AccountId) -> AccountId {
-    let wasm = load_wasm("/home/xlc/contract/flipper.wasm");
+    let wasm = load_wasm(FLIPPER_WASM);
     let wasm_hash = blake2_256(&wasm);
     let wasm_h: Hash = wasm_hash.clone().into();
-    let dest = srml_contracts::SimpleAddressDeterminator::<Runtime>::contract_address_for(
-        &wasm_h,
-        &vec![],
-        owner,
-    );
+    let dest = contract_address_for(&wasm_h, &vec![], owner);
     dest
 }
