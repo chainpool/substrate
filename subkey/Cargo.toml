@@ -13,7 +13,7 @@ rand = "0.6"
 clap = { version = "~2.32", features = ["yaml"] }
 tiny-bip39 = "0.6.0"
 rustc-hex = "2.0"
-substrate-bip39 = { git = "https://github.com/paritytech/substrate-bip39" }
+substrate-bip39 = { git = "https://github.com/paritytech/substrate-bip39", rev = "44307fda4ea17fe97aeb93af317fbc8f6ed34193" }
 schnorrkel = "0.1"
 hex = "0.3"
 hex-literal = "0.2"
