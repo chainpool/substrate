@@ -2,10 +2,6 @@
 name = "substrate"
 path = "node/src/main.rs"
 
-[[bin]]
-name = "contract"
-path = "test-contract/src/main.rs"
-
 [package]
 name = "substrate"
 version = "2.0.0"
@@ -92,7 +88,6 @@ members = [
 	"node-template",
 	"subkey",
 	"test-utils/chain-spec-builder",
-	"test-contract",
 ]
 exclude = [
 	"node/runtime/wasm",
