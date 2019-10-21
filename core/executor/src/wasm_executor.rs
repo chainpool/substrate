@@ -614,6 +614,45 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 			5
 		})
 	},
+	ext_secp256k1_ecdsa_verify(msg_data: *const u8, sig_data: *const u8, pubkey_data: *const u8, pubkey_len: u32) -> u32 => {
+		let mut sig = Vec::<u8>::new();
+		this.memory.get_into(sig_data, &mut sig[..]).map_err(|_| UserError("Invalid attempt to get signature in ext_secp256k1_ecdsa_verify"))?;
+		let mut rs = match secp256k1::Signature::parse_der_lax(&sig.as_slice()) {
+			Ok(rs) => rs,
+			_ => return Ok(1),
+		};
+		rs.normalize_s();
+
+		let mut msg = [0u8; 32];
+		this.memory.get_into(msg_data, &mut msg[..]).map_err(|_| UserError("Invalid attempt to get message in ext_secp256k1_ecdsa_verify"))?;
+		let msg = secp256k1::Message::parse(&msg);
+
+		let pubkey = match pubkey_len as usize {
+			secp256k1::util::COMPRESSED_PUBLIC_KEY_SIZE => {
+				let pubkey = [0; secp256k1::util::COMPRESSED_PUBLIC_KEY_SIZE];
+				this.memory.set(pubkey_data, &pubkey[..]).map_err(|_| UserError("Invalid attempt to set pubkey in ext_secp256k1_ecdsa_verify"))?;
+				match secp256k1::PublicKey::parse_compressed(&pubkey) {
+					Ok(pk) => pk,
+					_ => return Ok(2),
+				}
+			}
+			secp256k1::util::FULL_PUBLIC_KEY_SIZE => {
+				let pubkey = [0; secp256k1::util::FULL_PUBLIC_KEY_SIZE];
+				this.memory.set(pubkey_data, &pubkey[..]).map_err(|_| UserError("Invalid attempt to set pubkey in ext_secp256k1_ecdsa_verify"))?;
+				match secp256k1::PublicKey::parse(&pubkey) {
+					Ok(pk) => pk,
+					_ => return Ok(2),
+				}
+			}
+			_ => return Ok(2),
+		};
+
+		if secp256k1::verify(&msg, &rs, &pubkey) {
+			Ok(0)
+		} else {
+			Ok(3)
+		}
+	},
 	ext_secp256k1_ecdsa_recover(msg_data: *const u8, sig_data: *const u8, pubkey_data: *mut u8) -> u32 => {
 		let mut sig = [0u8; 65];
 		this.memory.get_into(sig_data, &mut sig[..]).map_err(|_| UserError("Invalid attempt to get signature in ext_secp256k1_ecdsa_recover"))?;
