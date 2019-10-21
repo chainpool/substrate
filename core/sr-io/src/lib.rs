@@ -43,6 +43,8 @@ pub enum EcdsaVerifyError {
 	BadV,
 	/// Invalid signature
 	BadSignature,
+	/// Invalid pubkey
+	BadPublicKey,
 }
 
 pub mod offchain;
@@ -201,6 +203,8 @@ export_api! {
 		/// Verify an sr25519 signature.
 		fn sr25519_verify<P: AsRef<[u8]>>(sig: &[u8; 64], msg: &[u8], pubkey: P) -> bool;
 
+		/// Verify a SECP256k1 ECDSA signature.
+		fn secp256k1_ecdsa_verify(sig: &[u8], msg: &[u8; 32], pubkey: &[u8; 64]) -> Result<bool, EcdsaVerifyError>;
 		/// Verify and recover a SECP256k1 ECDSA signature.
 		/// - `sig` is passed in RSV format. V should be either 0/1 or 27/28.
 		/// - returns `Err` if the signature is bad, otherwise the 64-byte pubkey (doesn't include the 0x04 prefix).
