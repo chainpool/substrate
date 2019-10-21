@@ -331,7 +331,7 @@ pub mod ext {
 		/// Note: ext_sr25519_verify returns 0 if the signature is correct, nonzero otherwise.
 		fn ext_sr25519_verify(msg_data: *const u8, msg_len: u32, sig_data: *const u8, pubkey_data: *const u8) -> u32;
 		/// Note: ext_secp256k1_ecdsa_verify returns 0 if the signature, message and public key is correct, nonzero otherwise.
-		fn ext_secp256k1_ecdsa_verify(msg_data: *const u8, sig_data: *const u8, pubkey_data: *const u8) -> u32;
+		fn ext_secp256k1_ecdsa_verify(msg_data: *const u8, sig_data: *const u8, pubkey_data: *const u8, pubkey_len: u32) -> u32;
 		/// Note: ext_secp256k1_ecdsa_recover returns 0 if the signature is correct, nonzero otherwise.
 		fn ext_secp256k1_ecdsa_recover(msg_data: *const u8, sig_data: *const u8, pubkey_data: *mut u8) -> u32;
 
@@ -811,9 +811,9 @@ impl CryptoApi for () {
 		}
 	}
 
-	fn secp256k1_ecdsa_verify(sig: &[u8], msg: &[u8; 32], pubkey: &[u8; 64]) -> Result<bool, EcdsaVerifyError> {
+	fn secp256k1_ecdsa_verify(sig: &[u8], msg: &[u8; 32], pubkey: &[u8]) -> Result<bool, EcdsaVerifyError> {
 		match unsafe {
-			ext_secp256k1_ecdsa_verify.get()(msg.as_ptr(), sig.as_ptr(), pubkey.as_ptr())
+			ext_secp256k1_ecdsa_verify.get()(msg.as_ptr(), sig.as_ptr(), pubkey.as_ptr(), pubkey.len() as u32)
 		} {
 			0 => Ok(true),
 			1 => Err(EcdsaVerifyError::BadSignature),
