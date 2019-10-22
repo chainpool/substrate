@@ -29,7 +29,7 @@ use substrate_telemetry::{telemetry, CONSENSUS_INFO};
 
 use crate::authorities::{AuthoritySet, SharedAuthoritySet, PendingChange, DelayKind};
 use crate::consensus_changes::{SharedConsensusChanges, ConsensusChanges};
-use crate::environment::{CompletedRound, CompletedRounds, HasVoted, SharedVoterSetState, VoterSetState};
+use crate::environment::{CompletedRound, CompletedRounds, HasVoted, SharedVoterSetState, VoterSetState, OldVoterSetState};
 use crate::NewAuthoritySet;
 
 use substrate_primitives::ed25519::Public as AuthorityId;
@@ -261,7 +261,7 @@ pub(crate) fn load_persistent<Block: BlockT, B, G>(
 		B: AuxStore,
 		G: FnOnce() -> ClientResult<Vec<(AuthorityId, u64)>>,
 {
-	let version: Option<u32> = load_decode(backend, VERSION_KEY).unwrap_or(Some(2));
+	let version: Option<u32> = load_decode(backend, VERSION_KEY)?;
 	let consensus_changes = load_decode(backend, CONSENSUS_CHANGES_KEY)?
 		.unwrap_or_else(ConsensusChanges::<Block::Hash, NumberFor<Block>>::empty);
 
@@ -294,7 +294,12 @@ pub(crate) fn load_persistent<Block: BlockT, B, G>(
 				let set_state = match load_decode::<_, VoterSetState<Block>>(
 					backend,
 					SET_STATE_KEY,
-				)? {
+				).or_else(|_| {
+					load_decode::<_, OldVoterSetState<Block>>(
+						backend,
+						SET_STATE_KEY,
+					).map(|v| v.map(Into::into))
+				})? {
 					Some(state) => state,
 					None => {
 						let state = make_genesis_round();
