@@ -107,13 +107,12 @@ where H: Clone + Debug + PartialEq,
 
 pub(crate) fn load_decode<B: AuxStore, T: Decode>(backend: &B, key: &[u8]) -> ClientResult<Option<T>> {
 	match backend.get_aux(key)? {
-		_ => Ok(None)
-//		None => Ok(None),
-//		Some(t) => T::decode(&mut &t[..])
-//			.ok_or_else(
-//				|| ClientError::Backend(format!("GRANDPA DB is corrupted.")),
-//			)
-//			.map(Some)
+		None => Ok(None),
+		Some(t) => T::decode(&mut &t[..])
+			.ok_or_else(
+				|| ClientError::Backend(format!("GRANDPA DB is corrupted.")),
+			)
+			.map(Some)
 	}
 }
 
