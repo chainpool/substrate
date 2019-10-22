@@ -261,7 +261,7 @@ pub(crate) fn load_persistent<Block: BlockT, B, G>(
 		B: AuxStore,
 		G: FnOnce() -> ClientResult<Vec<(AuthorityId, u64)>>,
 {
-	let version: Option<u32> = load_decode(backend, VERSION_KEY)?;
+	let version: Option<u32> = load_decode(backend, VERSION_KEY).unwrap_or(Some(2));
 	let consensus_changes = load_decode(backend, CONSENSUS_CHANGES_KEY)?
 		.unwrap_or_else(ConsensusChanges::<Block::Hash, NumberFor<Block>>::empty);
 
