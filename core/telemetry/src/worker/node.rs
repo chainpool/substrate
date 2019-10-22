@@ -98,7 +98,7 @@ where TTrans: Clone, TTrans::Output: Sink<SinkItem = BytesMut, SinkError = TSink
 				pending.push_back(payload.into());
 				Ok(())
 			} else {
-				warn!(target: "telemetry", "Rejected log entry because queue is full for {:?}",
+				debug!(target: "telemetry", "Rejected log entry because queue is full for {:?}",
 					self.addr);
 				Err(())
 			}
