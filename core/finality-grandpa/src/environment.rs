@@ -168,6 +168,65 @@ pub enum VoterSetState<Block: BlockT> {
 	},
 }
 
+#[derive(Debug, Decode, Encode, PartialEq)]
+pub enum OldVoterSetState<Block: BlockT> {
+	/// The voter is live, i.e. participating in rounds.
+	Live {
+		/// The previously completed rounds.
+		completed_rounds: OldCompletedRounds<Block>,
+		/// Vote status for the current round.
+		current_round: HasVoted<Block>,
+	},
+	/// The voter is paused, i.e. not casting or importing any votes.
+	Paused {
+		/// The previously completed rounds.
+		completed_rounds: OldCompletedRounds<Block>,
+	},
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OldCompletedRounds<Block: BlockT> {
+	inner: VecDeque<CompletedRound<Block>>,
+}
+
+impl<Block: BlockT> Encode for OldCompletedRounds<Block> {
+	fn encode(&self) -> Vec<u8> {
+		Vec::from_iter(&self.inner).encode()
+	}
+}
+
+impl<Block: BlockT> Decode for OldCompletedRounds<Block> {
+	fn decode<I: parity_codec::Input>(value: &mut I) -> Option<Self> {
+		Vec::<CompletedRound<Block>>::decode(value)
+			.map(|completed_rounds| OldCompletedRounds {
+				inner: completed_rounds.into(),
+			})
+	}
+}
+
+impl<B: BlockT> Into<CompletedRounds<B>> for OldCompletedRounds<B> {
+	fn into(self) -> CompletedRounds<B> {
+		CompletedRounds {
+			rounds: self.inner,
+			set_id: 0,
+			voters: Default::default(),
+		}
+	}
+}
+
+impl<B: BlockT> Into<VoterSetState<B>> for OldVoterSetState<B> {
+	fn into(self) -> VoterSetState<B> {
+		match self {
+			OldVoterSetState::Live { completed_rounds, current_round} => {
+				VoterSetState::Live { completed_rounds: completed_rounds.into(), current_round }
+			},
+			OldVoterSetState::Paused { completed_rounds} => {
+				VoterSetState::Paused { completed_rounds: completed_rounds.into() }
+			}
+		}
+	}
+}
+
 impl<Block: BlockT> VoterSetState<Block> {
 	/// Returns the last completed rounds.
 	pub(crate) fn completed_rounds(&self) -> CompletedRounds<Block> {
