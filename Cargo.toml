@@ -104,3 +104,21 @@ is-it-maintained-open-issues = { repository = "paritytech/substrate" }
 [profile.release]
 # Substrate runtime requires unwinding.
 panic = "unwind"
+
+[features]
+msgbus-log = [
+	"cli/msgbus-log"
+]
+
+msgbus-redis = [
+	"cli/msgbus-redis"
+]
+
+msgbus-redis-keyhash = [
+	"msgbus-redis",
+	"cli/msgbus-redis-keyhash",
+]
+
+cache-lru = [
+	"cli/cache-lru"
+]
