@@ -39,8 +39,8 @@ mod tests {
 	use node_primitives::{Hash, BlockNumber, AccountId};
 	use runtime_primitives::traits::{Header as HeaderT, Hash as HashT, Digest, DigestItem};
 	use runtime_primitives::{generic::Era, ApplyOutcome, ApplyError, ApplyResult, Perbill};
-	use {balances, indices, session, system, staking, consensus, timestamp, treasury, contract};
-	use contract::ContractAddressFor;
+	use {balances, indices, session, system, staking, consensus, timestamp, treasury, contracts};
+	use contracts::ContractAddressFor;
 	use system::{EventRecord, Phase};
 	use node_runtime::{Header, Block, UncheckedExtrinsic, CheckedExtrinsic, Call, Runtime, Balances,
 		BuildStorage, GenesisConfig, BalancesConfig, SessionConfig, StakingConfig, System,
@@ -51,6 +51,10 @@ mod tests {
 	const BLOATY_CODE: &[u8] = include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.wasm");
 	const COMPACT_CODE: &[u8] = include_bytes!("../../runtime/wasm/target/wasm32-unknown-unknown/release/node_runtime.compact.wasm");
 	const GENESIS_HASH: [u8; 32] = [69u8; 32];
+
+	pub const MILLICENTS: u128 = 1_000_000_000;
+	pub const CENTS: u128 = 1_000 * MILLICENTS;    // assume this is worth about a cent.
+	pub const DOLLARS: u128 = 100 * CENTS;
 
 	type TestExternalities<H> = CoreTestExternalities<H, u64>;
 
@@ -278,7 +282,7 @@ mod tests {
 				balances: vec![
 					(alice(), 111),
 					(bob(), 100),
-					(charlie(), 100_000_000),
+					(charlie(), 100_000_000 * DOLLARS),
 					(dave(), 111),
 					(eve(), 101),
 					(ferdie(), 100),
@@ -318,7 +322,7 @@ mod tests {
 			council_seats: Some(Default::default()),
 			timestamp: Some(Default::default()),
 			treasury: Some(Default::default()),
-			contract: Some(Default::default()),
+			contracts: Some(Default::default()),
 			sudo: Some(Default::default()),
 			grandpa: Some(GrandpaConfig {
 				authorities: vec![],
@@ -645,22 +649,23 @@ mod tests {
 	;;    input_data_len: u32
 	;; ) -> u32
 	(import "env" "ext_call" (func $ext_call (param i32 i32 i64 i32 i32 i32 i32) (result i32)))
-	(import "env" "ext_input_size" (func $ext_input_size (result i32)))
-	(import "env" "ext_input_copy" (func $ext_input_copy (param i32 i32 i32)))
+	(import "env" "ext_scratch_size" (func $ext_scratch_size (result i32)))
+	(import "env" "ext_scratch_read" (func $ext_scratch_read (param i32 i32 i32)))
 	(import "env" "memory" (memory 1 1))
 	(func (export "deploy")
 	)
 	(func (export "call")
 		(block $fail
-			;; fail if ext_input_size != 4
+			;; load and check the input data (which is stored in the scratch buffer).
+			;; fail if the input size is not != 4
 			(br_if $fail
 				(i32.ne
 					(i32.const 4)
-					(call $ext_input_size)
+					(call $ext_scratch_size)
 				)
 			)
 
-			(call $ext_input_copy
+			(call $ext_scratch_read
 				(i32.const 0)
 				(i32.const 0)
 				(i32.const 4)
@@ -710,10 +715,17 @@ mod tests {
 	)
 	;; Destination AccountId to transfer the funds.
 	;; Represented by H256 (32 bytes long) in little endian.
-	(data (i32.const 4) "\09\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00")
+	(data (i32.const 4)
+		"\09\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
+		"\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
+		"\00\00\00\00"
+	)
 	;; Amount of value to transfer.
 	;; Represented by u128 (16 bytes long) in little endian.
-	(data (i32.const 36) "\06\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00")
+	(data (i32.const 36)
+		"\06\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
+		"\00\00"
+	)
 )
 "#;
 
@@ -723,7 +735,7 @@ mod tests {
 		let transfer_code = wabt::wat2wasm(CODE_TRANSFER).unwrap();
 		let transfer_ch = <Runtime as system::Trait>::Hashing::hash(&transfer_code);
 
-		let addr = <Runtime as contract::Trait>::DetermineContractAddress::contract_address_for(
+		let addr = <Runtime as contracts::Trait>::DetermineContractAddress::contract_address_for(
 			&transfer_ch,
 			&[],
 			&charlie(),
@@ -740,20 +752,20 @@ mod tests {
 				},
 				CheckedExtrinsic {
 					signed: Some((charlie(), 0)),
-					function: Call::Contract(
-						contract::Call::put_code::<Runtime>(10_000, transfer_code)
+					function: Call::Contracts(
+						contracts::Call::put_code::<Runtime>(10_000_000, transfer_code)
 					),
 				},
 				CheckedExtrinsic {
 					signed: Some((charlie(), 1)),
-					function: Call::Contract(
-						contract::Call::create::<Runtime>(10, 10_000, transfer_ch, Vec::new())
+					function: Call::Contracts(
+						contracts::Call::instantiate::<Runtime>(1 * DOLLARS, 2_000_000_000_000, transfer_ch, Vec::new())
 					),
 				},
 				CheckedExtrinsic {
 					signed: Some((charlie(), 2)),
-					function: Call::Contract(
-						contract::Call::call::<Runtime>(indices::address::Address::Id(addr.clone()), 10, 10_000, vec![0x00, 0x01, 0x02, 0x03])
+					function: Call::Contracts(
+						contracts::Call::call::<Runtime>(indices::address::Address::Id(addr.clone()), 1 * DOLLARS, 2_000_000_000_000, vec![0x00, 0x01, 0x02, 0x03])
 					),
 				},
 			]
@@ -766,7 +778,7 @@ mod tests {
 		runtime_io::with_externalities(&mut t, || {
 			// Verify that the contract constructor worked well and code of TRANSFER contract is actually deployed.
 			assert_eq!(
-				&contract::ContractInfoOf::<Runtime>::get(addr)
+				&contracts::ContractInfoOf::<Runtime>::get(addr)
 					.and_then(|c| c.get_alive())
 					.unwrap()
 					.code_hash,

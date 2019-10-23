@@ -288,7 +288,7 @@ pub trait Currency<AccountId> {
 	/// The 'free' balance of a given account.
 	///
 	/// This is the only balance that matters in terms of most operations on tokens. It alone
-	/// is used to determine the balance when in the contract execution environment. When this
+	/// is used to determine the balance when in the contracts execution environment. When this
 	/// balance falls below the value of `ExistentialDeposit`, then the 'current account' is
 	/// deleted: specifically `FreeBalance`. Further, the `OnFreeBalanceZero` callback
 	/// is invoked, giving a chance to external modules to clean up data associated with
