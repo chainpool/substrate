@@ -551,13 +551,14 @@ impl<B: BlockT, S: NetworkSpecialization<B>, H: ExHashT> Protocol<B, S, H> {
 			GenericMessage::FinalityProofResponse(response) =>
 				return self.on_finality_proof_response(network_out, who, response),
 			GenericMessage::Consensus(msg) => {
-				if self.context_data.peers.get(&who).map_or(false, |peer| peer.info.protocol_version > 2) {
+				debug!(target: "gossip", "---Received Consensus message---");
+				/*if self.context_data.peers.get(&who).map_or(false, |peer| peer.info.protocol_version > 2) {
 					self.consensus_gossip.on_incoming(
 						&mut ProtocolContext::new(&mut self.context_data, network_out),
 						who,
 						msg,
 					);
-				}
+				}*/
 			}
 			other => self.specialization.on_message(
 				&mut ProtocolContext::new(&mut self.context_data, network_out),
