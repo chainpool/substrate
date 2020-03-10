@@ -26,7 +26,7 @@ futures = "0.1.26"
 tokio-timer = "0.2.11"
 parking_lot = "0.8.0"
 log = "0.4.6"
-schnorrkel = "0.1.1"
+schnorrkel = "0.8.4"
 rand = "0.6.5"
 merlin = "1.0.3"
 

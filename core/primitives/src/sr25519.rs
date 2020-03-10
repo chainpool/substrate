@@ -22,7 +22,7 @@
 // end::description[]
 
 #[cfg(feature = "std")]
-use schnorrkel::{signing_context, Keypair, SecretKey, MiniSecretKey, PublicKey,
+use schnorrkel::{signing_context, ExpansionMode, Keypair, SecretKey, MiniSecretKey, PublicKey,
 	derive::{Derivation, ChainCode, CHAIN_CODE_LENGTH}
 };
 #[cfg(feature = "std")]
@@ -35,9 +35,9 @@ use crate::{hash::{H256, H512}, crypto::UncheckedFrom};
 use parity_codec::{Encode, Decode};
 
 #[cfg(feature = "std")]
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "std")]
-use schnorrkel::keys::MINI_SECRET_KEY_LENGTH;
+use schnorrkel::keys::{MINI_SECRET_KEY_LENGTH, SECRET_KEY_LENGTH};
 
 // signing context
 #[cfg(feature = "std")]
@@ -333,7 +333,7 @@ impl AsRef<Pair> for Pair {
 #[cfg(feature = "std")]
 impl From<MiniSecretKey> for Pair {
 	fn from(sec: MiniSecretKey) -> Pair {
-		Pair(sec.expand_to_keypair())
+		Pair(sec.expand_to_keypair(ExpansionMode::Ed25519))
 	}
 }
 
@@ -367,8 +367,8 @@ impl AsRef<schnorrkel::Keypair> for Pair {
 
 /// Derive a single hard junction.
 #[cfg(feature = "std")]
-fn derive_hard_junction(secret: &SecretKey, cc: &[u8; CHAIN_CODE_LENGTH]) -> SecretKey {
-	secret.hard_derive_mini_secret_key(Some(ChainCode(cc.clone())), b"").0.expand()
+fn derive_hard_junction(secret: &SecretKey, cc: &[u8; CHAIN_CODE_LENGTH]) -> MiniSecretKey {
+	secret.hard_derive_mini_secret_key(Some(ChainCode(cc.clone())), b"").0
 }
 
 #[cfg(feature = "std")]
@@ -403,14 +403,22 @@ impl TraitPair for Pair {
 	///
 	/// You should never need to use this; generate(), generate_with_phrase(), from_phrase()
 	fn from_seed_slice(seed: &[u8]) -> Result<Pair, SecretStringError> {
-		if seed.len() != MINI_SECRET_KEY_LENGTH {
-			Err(SecretStringError::InvalidSeedLength)
-		} else {
-			Ok(Pair(
-				MiniSecretKey::from_bytes(seed)
-					.map_err(|_| SecretStringError::InvalidSeed)?
-					.expand_to_keypair()
-			))
+		match seed.len() {
+			MINI_SECRET_KEY_LENGTH => {
+				Ok(Pair(
+					MiniSecretKey::from_bytes(seed)
+						.map_err(|_| SecretStringError::InvalidSeed)?
+						.expand_to_keypair(ExpansionMode::Ed25519)
+				))
+			}
+			SECRET_KEY_LENGTH => {
+				Ok(Pair(
+					SecretKey::from_bytes(seed)
+						.map_err(|_| SecretStringError::InvalidSeed)?
+						.to_keypair()
+				))
+			}
+			_ => Err(SecretStringError::InvalidSeedLength)
 		}
 	}
 
@@ -447,7 +455,10 @@ impl TraitPair for Pair {
 		let init = self.0.secret.clone();
 		let result = path.fold(init, |acc, j| match j {
 			DeriveJunction::Soft(cc) => acc.derived_key_simple(ChainCode(cc), &[]).0,
-			DeriveJunction::Hard(cc) => derive_hard_junction(&acc, &cc),
+			DeriveJunction::Hard(cc) => {
+				let seed = derive_hard_junction(&acc, &cc);
+				seed.expand(ExpansionMode::Ed25519)
+			}
 		});
 		Ok(Self(result.into()))
 	}
@@ -459,28 +470,18 @@ impl TraitPair for Pair {
 
 	/// Verify a signature on a message. Returns true if the signature is good.
 	fn verify<P: AsRef<Self::Public>, M: AsRef<[u8]>>(sig: &Self::Signature, message: M, pubkey: P) -> bool {
-		let signature: schnorrkel::Signature = match schnorrkel::Signature::from_bytes(&sig.as_ref()) {
-			Ok(some_signature) => some_signature,
-			Err(_) => return false
-		};
-		match PublicKey::from_bytes(pubkey.as_ref().as_slice()) {
-			Ok(pk) => pk.verify(
-				signing_context(SIGNING_CTX).bytes(message.as_ref()), &signature
-			),
-			Err(_) => false,
-		}
+		Self::verify_weak(&sig.0[..], message, pubkey.as_ref().0.as_ref())
 	}
 
 	/// Verify a signature on a message. Returns true if the signature is good.
 	fn verify_weak<P: AsRef<[u8]>, M: AsRef<[u8]>>(sig: &[u8], message: M, pubkey: P) -> bool {
-		let signature: schnorrkel::Signature = match schnorrkel::Signature::from_bytes(sig) {
-			Ok(some_signature) => some_signature,
-			Err(_) => return false
-		};
+		// Match both schnorrkel 0.1.1 and 0.8.0+ signatures, supporting both wallets
+		// that have not been upgraded and those that have. To swap to 0.8.0 only,
+		// create `schnorrkel::Signature` and pass that into `verify_simple`
 		match PublicKey::from_bytes(pubkey.as_ref()) {
-			Ok(pk) => pk.verify(
-				signing_context(SIGNING_CTX).bytes(message.as_ref()), &signature
-			),
+			Ok(pk) => pk.verify_simple_preaudit_deprecated(
+				SIGNING_CTX, message.as_ref(), &sig,
+			).is_ok(),
 			Err(_) => false,
 		}
 	}
@@ -496,7 +497,7 @@ impl Pair {
 		let mini_key: MiniSecretKey = mini_secret_from_entropy(entropy, password.unwrap_or(""))
 			.expect("32 bytes can always build a key; qed");
 
-		let kp = mini_key.expand_to_keypair();
+		let kp = mini_key.expand_to_keypair(ExpansionMode::Ed25519);
 		(Pair(kp), mini_key.to_bytes())
 	}
 }
