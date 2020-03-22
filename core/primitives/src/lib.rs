@@ -45,7 +45,7 @@ pub use impl_serde::serialize as bytes;
 #[cfg(feature = "std")]
 pub mod hashing;
 #[cfg(feature = "std")]
-pub use hashing::{blake2_128, blake2_256, twox_64, twox_128, twox_256};
+pub use hashing::{blake2_128, blake2_256, twox_64, twox_128, twox_256, keccak_256, sha2_256};
 #[cfg(feature = "std")]
 pub mod hexdisplay;
 pub mod crypto;

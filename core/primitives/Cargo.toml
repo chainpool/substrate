@@ -22,6 +22,7 @@ blake2-rfc = { version = "0.2.18", optional = true }
 schnorrkel = { version = "0.8.4", features = ["preaudit_deprecated", "u64_backend"], optional = true }
 rand = { version = "0.6", optional = true }
 sha2 = { version = "0.8", optional = true }
+tiny-keccak = { version = "2.0.1", features = ["keccak"], optional = true }
 substrate-bip39 = { git = "https://github.com/chainx-org/substrate-bip39.git", branch = "chainx-master", optional = true }
 tiny-bip39 = { version = "0.6.1", optional = true }
 hex = { version = "0.3", optional = true }
@@ -70,6 +71,7 @@ std = [
 	"byteorder/std",
 	"rand",
 	"sha2",
+	"tiny-keccak",
 	"schnorrkel",
 	"regex",
 	"num-traits/std",

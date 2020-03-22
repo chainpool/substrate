@@ -15,7 +15,7 @@
 // along with Substrate.  If not, see <http://www.gnu.org/licenses/>.
 
 use primitives::{
-	blake2_128, blake2_256, twox_128, twox_256, twox_64, ed25519, Blake2Hasher,
+	blake2_128, blake2_256, twox_128, twox_256, twox_64, keccak_256, sha2_256, ed25519, Blake2Hasher,
 	sr25519, Pair
 };
 // Switch to this after PoC-3
@@ -242,7 +242,11 @@ impl CryptoApi for () {
 
 impl HashingApi for () {
 	fn keccak_256(data: &[u8]) -> [u8; 32] {
-		tiny_keccak::keccak256(data)
+		keccak_256(data)
+	}
+
+	fn sha2_256(data: &[u8]) -> [u8; 32] {
+		sha2_256(data)
 	}
 
 	fn blake2_128(data: &[u8]) -> [u8; 16] {

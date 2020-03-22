@@ -326,6 +326,8 @@ pub mod ext {
 		fn ext_twox_256(data: *const u8, len: u32, out: *mut u8);
 		/// Keccak256 hash
 		fn ext_keccak_256(data: *const u8, len: u32, out: *mut u8);
+		/// Sha2 256 hash
+		fn ext_sha2_256(data: *const u8, len: u32, out: *mut u8);
 		/// Note: ext_ed25519_verify returns 0 if the signature is correct, nonzero otherwise.
 		fn ext_ed25519_verify(msg_data: *const u8, msg_len: u32, sig_data: *const u8, pubkey_data: *const u8) -> u32;
 		/// Note: ext_sr25519_verify returns 0 if the signature is correct, nonzero otherwise.
@@ -753,6 +755,14 @@ impl HashingApi for () {
 		let mut result: [u8; 32] = Default::default();
 		unsafe {
 			ext_keccak_256.get()(data.as_ptr(), data.len() as u32, result.as_mut_ptr());
+		}
+		result
+	}
+
+	fn sha2_256(data: &[u8]) -> [u8; 32] {
+		let mut result: [u8; 32] = Default::default();
+		unsafe {
+			ext_sha2_256.get()(data.as_ptr(), data.len() as u32, result.as_mut_ptr());
 		}
 		result
 	}

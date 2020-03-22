@@ -30,7 +30,7 @@ use wasmi::memory_units::{Pages};
 use state_machine::{Externalities, ChildStorageKey};
 use crate::error::{Error, Result};
 use crate::wasm_utils::UserError;
-use primitives::{blake2_128, blake2_256, twox_64, twox_128, twox_256, ed25519, sr25519, Pair};
+use primitives::{blake2_128, blake2_256, twox_64, twox_128, twox_256, keccak_256, sha2_256, ed25519, sr25519, Pair};
 use primitives::hashing::blake2_512;
 use primitives::offchain;
 use primitives::hexdisplay::HexDisplay;
@@ -581,11 +581,22 @@ impl_function_executor!(this: FunctionExecutor<'e, E>,
 	},
 	ext_keccak_256(data: *const u8, len: u32, out: *mut u8) => {
 		let result: [u8; 32] = if len == 0 {
-			tiny_keccak::keccak256(&[0u8; 0])
+			// tiny_keccak::keccak256(&[0u8; 0])
+			keccak_256(&[0u8; 0])
 		} else {
-			tiny_keccak::keccak256(&this.memory.get(data, len as usize).map_err(|_| UserError("Invalid attempt to get data in ext_keccak_256"))?)
+			// tiny_keccak::keccak256(&this.memory.get(data, len as usize).map_err(|_| UserError("Invalid attempt to get data in ext_keccak_256"))?)
+			keccak_256(&this.memory.get(data, len as usize).map_err(|_| UserError("Invalid attempt to get data in ext_keccak_256"))?)
 		};
 		this.memory.set(out, &result).map_err(|_| UserError("Invalid attempt to set result in ext_keccak_256"))?;
+		Ok(())
+	},
+	ext_sha2_256(data: *const u8, len: u32, out: *mut u8) => {
+		let result: [u8; 32] = if len == 0 {
+			sha2_256(&[0u8; 0])
+		} else {
+			sha2_256(&this.memory.get(data, len as usize).map_err(|_| UserError("Invalid attempt to get data in ext_sha2_256"))?)
+		};
+		this.memory.set(out, &result).map_err(|_| UserError("Invalid attempt to set result in ext_sha2_256"))?;
 		Ok(())
 	},
 	ext_ed25519_verify(msg_data: *const u8, msg_len: u32, sig_data: *const u8, pubkey_data: *const u8) -> u32 => {
